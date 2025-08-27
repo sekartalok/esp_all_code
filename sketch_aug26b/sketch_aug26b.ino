@@ -1,98 +1,95 @@
 #include <Adafruit_SSD1306.h>
 
-TaskHandle_t Task1;
-TaskHandle_t Task2;
-TaskHandle_t Task3;
+TaskHandle_t task1;
+TaskHandle_t task2;
+TaskHandle_t task3;
 
-struct LCD_VAR {
-  unsigned int SCREEN_WIDTH = 128;
-  unsigned int SCREEN_HEIGHT = 64;
-  int OLED_RESET = -1;
-  unsigned int OLED_SDA = 18;
-  unsigned int OLED_SCL = 17;
+struct lcd_var {
+  unsigned int screen_width = 128;
+  unsigned int screen_height = 64;
+  int oled_reset = -1;
+  unsigned int oled_sda = 18;
+  unsigned int oled_scl = 17;
 };
 
-struct PASSING {
+struct passing {
   unsigned int delay = 500;
   String test = "HELLO WORLD";
 };
 
-static const LCD_VAR LCD;
-static PASSING PASS;
+static const lcd_var lcd;
+static passing pass;
 
-static SemaphoreHandle_t MUTEX;
-static SemaphoreHandle_t LED_GATE;
+static SemaphoreHandle_t mutex;
+static SemaphoreHandle_t led_gate;
 
-static const int LEDS = 37;
-static volatile unsigned int COUNT = 0;
-static int HEAPALLOCT1 = 1000;
-static int HEAPALLOCT2 = 1524;
-const int BUTTON = 48;
+static const int leds = 37;
+static volatile unsigned int count = 0;
+static int heapalloc_t1 = 1000;
+static int heapalloc_t2 = 1524;
+const int button = 48;
 
-static bool LEDCON = false;
-static bool REOPEN = true;
+static bool ledcon = false;
+static bool reopen = true;
 
-
-static int DELAY = 500;
-static const unsigned int DEBAUNCH_T = 150;
+static int delay_time = 500;
+static const unsigned int debauch_t = 150;
 
 //ISR VAR
-//static volatile bool INTERUPT = false;
-static volatile unsigned long LAST_MILLIS;
-
+//static volatile bool interupt = false;
+static volatile unsigned long last_millis;
 
 // OLED
-Adafruit_SSD1306 display(LCD.SCREEN_WIDTH, LCD.SCREEN_HEIGHT, &Wire, LCD.OLED_RESET);
-
+Adafruit_SSD1306 display(lcd.screen_width, lcd.screen_height, &Wire, lcd.oled_reset);
 
 void IRAM_ATTR interupts() {
   unsigned long _current_millis = millis();
-  if (_current_millis - LAST_MILLIS < DEBAUNCH_T) {
+  if (_current_millis - last_millis < debauch_t) {
     return;
   }
- // xSemaphoreGive(LED_GATE);
-  xTaskNotifyGive(Task3);
-  LAST_MILLIS = _current_millis;
- Serial.println("INTERUPTING ALL TASK ");
+ // xSemaphoreGive(led_gate);
+  xTaskNotifyGive(task3);
+  last_millis = _current_millis;
+  Serial.println("INTERUPTING ALL TASK ");
 }
 
 bool display_status() {
-  Wire.begin(LCD.OLED_SDA, LCD.OLED_SCL);
+  Wire.begin(lcd.oled_sda, lcd.oled_scl);
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     return true;
   }
   return false;
 }
 
-int STACKVALT1() { return uxTaskGetStackHighWaterMark(Task1); }
-int STACKVALT2() { return uxTaskGetStackHighWaterMark(Task2); }
-int STACKVALT3() { return uxTaskGetStackHighWaterMark(Task3); }
+int stack_val_t1() { return uxTaskGetStackHighWaterMark(task1); }
+int stack_val_t2() { return uxTaskGetStackHighWaterMark(task2); }
+int stack_val_t3() { return uxTaskGetStackHighWaterMark(task3); }
 
-void LED(int *delay) {
-  digitalWrite(LEDS, HIGH);
-  vTaskDelay(*delay / portTICK_PERIOD_MS);
-  digitalWrite(LEDS, LOW);
-  vTaskDelay(*delay / portTICK_PERIOD_MS);
+void led(int *ptr_delay) {
+  digitalWrite(leds, HIGH);
+  vTaskDelay(*ptr_delay / portTICK_PERIOD_MS);
+  digitalWrite(leds, LOW);
+  vTaskDelay(*ptr_delay / portTICK_PERIOD_MS);
 }
 
-void LCDS(int _param, PASSING *_pass) {
+void lcds(int _param, passing *ptr_pass) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0, 0);
   display.print("HEAP 1 :");
-  display.println(STACKVALT1());
+  display.println(stack_val_t1());
 
   display.print("HEAP 2 :");
-  display.println(STACKVALT2());
+  display.println(stack_val_t2());
 
   display.print("HEAP 3 :");
-  display.println(STACKVALT3());
+  display.println(stack_val_t3());
 
   display.setCursor(0, 40);
   display.print("test line : ");
-  display.println(_pass->test);
+  display.println(ptr_pass->test);
 
   display.setCursor(0, 54);
   display.print("Count: ");
@@ -101,23 +98,23 @@ void LCDS(int _param, PASSING *_pass) {
   display.display();
 }
 
-void FLED_IN(void * _param) {
-  (void)_param;
+void fled_in(void *ptr_param) {
+  (void)ptr_param;
   while (1) {
      if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) == pdPASS) {
-      if(!REOPEN){
-        xSemaphoreGive(LED_GATE);
+      if(!reopen){
+        xSemaphoreGive(led_gate);
       }
-      if(xSemaphoreTake(LED_GATE, portMAX_DELAY) == pdPASS){
-        LEDCON = !LEDCON;
-        digitalWrite(LEDS, LEDCON);
-        REOPEN = false;
+      if(xSemaphoreTake(led_gate, portMAX_DELAY) == pdPASS){
+        ledcon = !ledcon;
+        digitalWrite(leds, ledcon);
+        reopen = false;
       }
      }    
       else{
-          if(!REOPEN && !LEDCON){
-          xSemaphoreGive(LED_GATE);
-          REOPEN = true;
+          if(!reopen && !ledcon){
+          xSemaphoreGive(led_gate);
+          reopen = true;
           }
       }
     }
@@ -125,20 +122,17 @@ void FLED_IN(void * _param) {
   }
 
 
-void FLED(void *_param) {
-  int _delay = *((int *)_param);
+void fled(void *ptr_param) {
+  int _delay = *((int *)ptr_param);
   while (1) {
-    if(xSemaphoreTake(LED_GATE, 1) == pdPASS){
-      LED(&_delay);
-      
-      xSemaphoreGive(LED_GATE);
-      
-
+    if(xSemaphoreTake(led_gate, 1) == pdPASS){
+      led(&_delay);
+      xSemaphoreGive(led_gate);
     }
    
-    if (xSemaphoreTake(MUTEX, 0) == pdTRUE) {
-      COUNT++;
-      xSemaphoreGive(MUTEX);
+    if (xSemaphoreTake(mutex, 0) == pdTRUE) {
+      count++;
+      xSemaphoreGive(mutex);
     } else {
       // optional: Serial.println("in use LED");
     }
@@ -146,12 +140,12 @@ void FLED(void *_param) {
   }
 }
 
-void FLCD(void *_param) {
-  PASSING _pass = *((PASSING *)_param);
+void flcd(void *ptr_param) {
+  passing _pass = *((passing *)ptr_param);
   while (1) {
-    if (xSemaphoreTake(MUTEX, 0) == pdTRUE) {
-      LCDS(COUNT, &_pass);
-      xSemaphoreGive(MUTEX);
+    if (xSemaphoreTake(mutex, 0) == pdTRUE) {
+      lcds(count, &_pass);
+      xSemaphoreGive(mutex);
     } else {
       // optional: Serial.println("in use LCD");
     }
@@ -163,47 +157,47 @@ void setup() {
   Serial.begin(9600);
   delay(500);
 
-  MUTEX = xSemaphoreCreateMutex();
-  LED_GATE = xSemaphoreCreateBinary();
-  xSemaphoreGive(LED_GATE);
+  mutex = xSemaphoreCreateMutex();
+  led_gate = xSemaphoreCreateBinary();
+  xSemaphoreGive(led_gate);
 
-  pinMode(LEDS, OUTPUT);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(leds, OUTPUT);
+  pinMode(button, INPUT_PULLUP);
 
   // use FALLING to avoid double triggers on mechanical bounce when you only want presses
-  attachInterrupt(digitalPinToInterrupt(BUTTON), interupts, FALLING);
+  attachInterrupt(digitalPinToInterrupt(button), interupts, FALLING);
 
   if (display_status()) {
     Serial.println("alloc faill");
   }
 
   xTaskCreatePinnedToCore(
-    FLED,
+    fled,
     "LED",
-    HEAPALLOCT1,
-    &DELAY,
+    heapalloc_t1,
+    &delay_time,
     1,
-    &Task1,
+    &task1,
     1
   );
 
   xTaskCreatePinnedToCore(
-    FLCD,
+    flcd,
     "LCD",
-    HEAPALLOCT2,
-    &PASS,
+    heapalloc_t2,
+    &pass,
     2,
-    &Task2,
+    &task2,
     0
   );
 
   xTaskCreatePinnedToCore(
-    FLED_IN,
+    fled_in,
     "LED_INTER",
-    HEAPALLOCT1,
+    heapalloc_t1,
     NULL,
     2,
-    &Task3,
+    &task3,
     1
   );
 }
