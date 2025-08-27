@@ -35,7 +35,7 @@ static int DELAY = 500;
 static const unsigned int DEBAUNCH_T = 150;
 
 //ISR VAR
-static volatile bool INTERUPT = false;
+//static volatile bool INTERUPT = false;
 static volatile unsigned long LAST_MILLIS;
 
 
@@ -49,7 +49,7 @@ void IRAM_ATTR interupts() {
     return;
   }
 
-  INTERUPT = true;
+  xTaskNotifyGive(Task3);
   LAST_MILLIS = _current_millis;
  // Serial.println("INTERUPTING ALL TASK ");
 }
@@ -102,6 +102,11 @@ void LCDS(int _param, PASSING *_pass) {
 void FLED_IN(void * _param) {
   (void)_param;
   while (1) {
+     if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) == pdPASS) {
+      LEDCON = !LEDCON;
+      digitalWrite(LEDS, LEDCON);
+     }
+    /*
     if (INTERUPT) {
       //vTaskDelay(pdMS_TO_TICKS(150));
       LEDCON = !LEDCON;
@@ -110,11 +115,11 @@ void FLED_IN(void * _param) {
       digitalWrite(LEDS, LEDCON);
       Serial.println(LEDCON);
       vTaskDelay(100 / portTICK_PERIOD_MS);
-    
+    */
     }
     vTaskDelay(pdMS_TO_TICKS(1));
   }
-}
+
 
 void FLED(void *_param) {
   int _delay = *((int *)_param);
