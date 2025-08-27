@@ -40,7 +40,7 @@ Adafruit_SSD1306 display(LCD.SCREEN_WIDTH, LCD.SCREEN_HEIGHT, &Wire, LCD.OLED_RE
 
 void IRAM_ATTR interupts() {
   INTERUPT = true;
-  Serial.println("INTERUPTING ALL TASK ");
+ // Serial.println("INTERUPTING ALL TASK ");
 }
 
 bool display_status() {
