@@ -88,7 +88,7 @@ void LCDS(int _param, PASSING *_pass) {
   display.print("HEAP 3 :");
   display.println(STACKVALT3());
 
-  display.setCursor(0, 20);
+  display.setCursor(0, 40);
   display.print("test line : ");
   display.println(_pass->test);
 
