@@ -18,8 +18,10 @@ struct PASSING {
 };
 
 static const LCD_VAR LCD;
+static PASSING PASS;
 
 static SemaphoreHandle_t MUTEX;
+static SemaphoreHandle_t LED_GATE;
 
 static const int LEDS = 37;
 static volatile unsigned int COUNT = 0;
@@ -30,7 +32,7 @@ const int BUTTON = 48;
 static bool LEDCON = false;
 static bool REOPEN = true;
 
-static PASSING PASS;
+
 static int DELAY = 500;
 static const unsigned int DEBAUNCH_T = 150;
 
@@ -48,8 +50,10 @@ void IRAM_ATTR interupts() {
   if (_current_millis - LAST_MILLIS < DEBAUNCH_T) {
     return;
   }
-
+  //xSemaphoreGive(LED_GATE);
   xTaskNotifyGive(Task3);
+  Serial.println("BALLS");
+
   LAST_MILLIS = _current_millis;
  // Serial.println("INTERUPTING ALL TASK ");
 }
@@ -103,8 +107,19 @@ void FLED_IN(void * _param) {
   (void)_param;
   while (1) {
      if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) == pdPASS) {
+      xSemaphoreTake(LED_GATE, 0);
       LEDCON = !LEDCON;
       digitalWrite(LEDS, LEDCON);
+      REOPEN = false;
+
+
+     }
+     else{
+      if(!REOPEN && !LEDCON){
+         xSemaphoreGive(LED_GATE);
+         REOPEN = true;
+
+      }
      }
     }
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -114,6 +129,14 @@ void FLED_IN(void * _param) {
 void FLED(void *_param) {
   int _delay = *((int *)_param);
   while (1) {
+    if(xSemaphoreTake(LED_GATE, 1) == pdPASS){
+      LED(&_delay);
+      
+      xSemaphoreGive(LED_GATE);
+      
+
+    }
+   
     if (xSemaphoreTake(MUTEX, 0) == pdTRUE) {
       COUNT++;
       xSemaphoreGive(MUTEX);
@@ -142,6 +165,8 @@ void setup() {
   delay(500);
 
   MUTEX = xSemaphoreCreateMutex();
+  LED_GATE = xSemaphoreCreateBinary();
+  xSemaphoreGive(LED_GATE);
 
   pinMode(LEDS, OUTPUT);
   pinMode(BUTTON, INPUT_PULLUP);
