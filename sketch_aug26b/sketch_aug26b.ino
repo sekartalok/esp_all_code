@@ -22,24 +22,35 @@ static const LCD_VAR LCD;
 static SemaphoreHandle_t MUTEX;
 
 static const int LEDS = 37;
-static int COUNT = 0;
+static volatile unsigned int COUNT = 0;
 static int HEAPALLOCT1 = 1000;
 static int HEAPALLOCT2 = 1524;
 const int BUTTON = 48;
 
+static bool LEDCON = false;
+static bool REOPEN = true;
+
 static PASSING PASS;
 static int DELAY = 500;
+static const unsigned int DEBAUNCH_T = 150;
 
-// must be volatile: written in ISR, read in task
+//ISR VAR
 static volatile bool INTERUPT = false;
-static volatile bool LEDCON = false;
+static volatile unsigned long LAST_MILLIS;
+
 
 // OLED
 Adafruit_SSD1306 display(LCD.SCREEN_WIDTH, LCD.SCREEN_HEIGHT, &Wire, LCD.OLED_RESET);
 
 
 void IRAM_ATTR interupts() {
+  unsigned long _current_millis = millis();
+  if (_current_millis - LAST_MILLIS < DEBAUNCH_T) {
+    return;
+  }
+
   INTERUPT = true;
+  LAST_MILLIS = _current_millis;
  // Serial.println("INTERUPTING ALL TASK ");
 }
 
@@ -53,6 +64,7 @@ bool display_status() {
 
 int STACKVALT1() { return uxTaskGetStackHighWaterMark(Task1); }
 int STACKVALT2() { return uxTaskGetStackHighWaterMark(Task2); }
+int STACKVALT3() { return uxTaskGetStackHighWaterMark(Task3); }
 
 void LED(int *delay) {
   digitalWrite(LEDS, HIGH);
@@ -73,6 +85,9 @@ void LCDS(int _param, PASSING *_pass) {
   display.print("HEAP 2 :");
   display.println(STACKVALT2());
 
+  display.print("HEAP 3 :");
+  display.println(STACKVALT3());
+
   display.setCursor(0, 20);
   display.print("test line : ");
   display.println(_pass->test);
@@ -88,9 +103,9 @@ void FLED_IN(void * _param) {
   (void)_param;
   while (1) {
     if (INTERUPT) {
-      vTaskDelay(pdMS_TO_TICKS(150));
+      //vTaskDelay(pdMS_TO_TICKS(150));
       LEDCON = !LEDCON;
-      vTaskDelay(150 / portTICK_PERIOD_MS);
+     // vTaskDelay(150 / portTICK_PERIOD_MS);
       INTERUPT = false;
       digitalWrite(LEDS, LEDCON);
       Serial.println(LEDCON);
