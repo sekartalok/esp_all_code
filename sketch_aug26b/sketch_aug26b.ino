@@ -50,12 +50,10 @@ void IRAM_ATTR interupts() {
   if (_current_millis - LAST_MILLIS < DEBAUNCH_T) {
     return;
   }
-  //xSemaphoreGive(LED_GATE);
+ // xSemaphoreGive(LED_GATE);
   xTaskNotifyGive(Task3);
-  Serial.println("BALLS");
-
   LAST_MILLIS = _current_millis;
- // Serial.println("INTERUPTING ALL TASK ");
+ Serial.println("INTERUPTING ALL TASK ");
 }
 
 bool display_status() {
@@ -107,20 +105,21 @@ void FLED_IN(void * _param) {
   (void)_param;
   while (1) {
      if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) == pdPASS) {
-      xSemaphoreTake(LED_GATE, 0);
-      LEDCON = !LEDCON;
-      digitalWrite(LEDS, LEDCON);
-      REOPEN = false;
-
-
-     }
-     else{
-      if(!REOPEN && !LEDCON){
-         xSemaphoreGive(LED_GATE);
-         REOPEN = true;
-
+      if(!REOPEN){
+        xSemaphoreGive(LED_GATE);
       }
-     }
+      if(xSemaphoreTake(LED_GATE, portMAX_DELAY) == pdPASS){
+        LEDCON = !LEDCON;
+        digitalWrite(LEDS, LEDCON);
+        REOPEN = false;
+      }
+     }    
+      else{
+          if(!REOPEN && !LEDCON){
+          xSemaphoreGive(LED_GATE);
+          REOPEN = true;
+          }
+      }
     }
     vTaskDelay(pdMS_TO_TICKS(1));
   }
