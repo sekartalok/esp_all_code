@@ -106,16 +106,6 @@ void FLED_IN(void * _param) {
       LEDCON = !LEDCON;
       digitalWrite(LEDS, LEDCON);
      }
-    /*
-    if (INTERUPT) {
-      //vTaskDelay(pdMS_TO_TICKS(150));
-      LEDCON = !LEDCON;
-     // vTaskDelay(150 / portTICK_PERIOD_MS);
-      INTERUPT = false;
-      digitalWrite(LEDS, LEDCON);
-      Serial.println(LEDCON);
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-    */
     }
     vTaskDelay(pdMS_TO_TICKS(1));
   }
