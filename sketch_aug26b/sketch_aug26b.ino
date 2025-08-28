@@ -37,7 +37,7 @@ static bool ledcon = false;
 static bool reopen = true;
 
 static int delay_time = 500;
-static const unsigned int debauch_t = 150;
+static const unsigned int debauch_t = 550;
 //queue
 static QueueHandle_t interupt_count_queue;
 static const unsigned int interupt_count_queue_max = 12;
