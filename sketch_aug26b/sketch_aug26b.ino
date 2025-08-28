@@ -17,7 +17,7 @@ struct lcd_var {
 
 struct passing {
   unsigned int delay = 500;
-  String test = "HELLO WORLD";
+  String test = "HELLOWORLD";
 };
 
 static const lcd_var lcd;
@@ -28,6 +28,7 @@ static SemaphoreHandle_t led_gate;
 
 static const int leds = 37;
 static volatile unsigned int count = 0;
+
 static int heapalloc_t1 = 1000;
 static int heapalloc_t2 = 1524;
 const int button = 48;
@@ -37,6 +38,9 @@ static bool reopen = true;
 
 static int delay_time = 500;
 static const unsigned int debauch_t = 150;
+//queue
+static QueueHandle_t interupt_count_queue;
+static const unsigned int interupt_count_queue_max = 12;
 //class
 interupt my_interupt;
 //ISR VAR
@@ -77,7 +81,7 @@ void led(int *ptr_delay) {
   vTaskDelay(*ptr_delay / portTICK_PERIOD_MS);
 }
 
-void lcds(int _param, passing *ptr_pass) {
+void lcds(int param,unsigned int interupt_count, passing *ptr_pass) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
@@ -95,22 +99,33 @@ void lcds(int _param, passing *ptr_pass) {
   display.print("CPU : ");
   display.println( prosseror_usage());
 
+  display.print("INTERUPT : ");
+  display.println( interupt_count );
+
   display.setCursor(0, 40);
-  display.print("test line : ");
+  display.print("test line :");
   display.println(ptr_pass->test);
 
   display.setCursor(0, 54);
   display.print("Count: ");
-  display.println(_param);
+  display.println(param);
 
 
   display.display();
 }
 
 void fled_in(void *ptr_param) {
-  (void)ptr_param;
+  unsigned int interupt_count = 0;
   while (1) {
      if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) == pdPASS) {
+
+      interupt_count++;
+
+      if(xQueueSend(interupt_count_queue , (void *) &interupt_count, 100 ) != pdTRUE){
+        Serial.println("queue full or timeout");
+      }
+
+
       if(!reopen){
         xSemaphoreGive(led_gate);
       }
@@ -132,10 +147,10 @@ void fled_in(void *ptr_param) {
 
 
 void fled(void *ptr_param) {
-  int _delay = *((int *)ptr_param);
+  int delay = *((int *)ptr_param);
   while (1) {
     if(xSemaphoreTake(led_gate, 1) == pdPASS){
-      led(&_delay);
+      led(&delay);
       xSemaphoreGive(led_gate);
     }
    
@@ -145,20 +160,25 @@ void fled(void *ptr_param) {
     } else {
       // optional: Serial.println("in use LED");
     }
-    vTaskDelay(_delay / portTICK_PERIOD_MS);
+    vTaskDelay(delay / portTICK_PERIOD_MS);
   }
 }
 
 void flcd(void *ptr_param) {
-  passing _pass = *((passing *)ptr_param);
+  passing pass = *((passing *)ptr_param);
+  unsigned int interupt_count = 0;
   while (1) {
+    xQueueReceive(interupt_count_queue, (void * ) &interupt_count, 0);
+
+
+
     if (xSemaphoreTake(mutex, 0) == pdTRUE) {
-      lcds(count, &_pass);
+      lcds(count,interupt_count, &pass);
       xSemaphoreGive(mutex);
-    } else {
-      // optional: Serial.println("in use LCD");
-    }
-    vTaskDelay(_pass.delay / portTICK_PERIOD_MS);
+    }  
+
+   
+    vTaskDelay(pass.delay / portTICK_PERIOD_MS);
   }
 }
 
@@ -169,6 +189,7 @@ void setup() {
   mutex = xSemaphoreCreateMutex();
   led_gate = xSemaphoreCreateBinary();
   xSemaphoreGive(led_gate);
+  interupt_count_queue = xQueueCreate(interupt_count_queue_max, sizeof(int));
 
   pinMode(leds, OUTPUT);
   //pinMode(button, INPUT_PULLUP);
