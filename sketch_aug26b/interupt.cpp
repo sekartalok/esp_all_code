@@ -18,7 +18,7 @@ void IRAM_ATTR interupt::interupts() {
   }
   xTaskNotifyGive(interupt::task3);
   interupt::last_millis = _current_millis;
-  Serial.println("INTERUPTING ALL TASK");
+
 }
 
 // Begin function implementation

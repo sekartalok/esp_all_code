@@ -110,7 +110,6 @@ void lcds(int param,unsigned int interupt_count, passing *ptr_pass) {
   display.print("Count: ");
   display.println(param);
 
-
   display.display();
 }
 
