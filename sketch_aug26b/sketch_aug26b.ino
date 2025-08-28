@@ -1,4 +1,7 @@
+
 #include <Adafruit_SSD1306.h>
+//call my class
+#include "interupt.h"
 
 TaskHandle_t task1;
 TaskHandle_t task2;
@@ -34,14 +37,15 @@ static bool reopen = true;
 
 static int delay_time = 500;
 static const unsigned int debauch_t = 150;
-
+//class
+interupt my_interupt;
 //ISR VAR
 //static volatile bool interupt = false;
-static volatile unsigned long last_millis;
+//static volatile unsigned long last_millis;
 
 // OLED
 Adafruit_SSD1306 display(lcd.screen_width, lcd.screen_height, &Wire, lcd.oled_reset);
-
+/*
 void IRAM_ATTR interupts() {
   unsigned long _current_millis = millis();
   if (_current_millis - last_millis < debauch_t) {
@@ -52,7 +56,7 @@ void IRAM_ATTR interupts() {
   last_millis = _current_millis;
   Serial.println("INTERUPTING ALL TASK ");
 }
-
+*/
 bool display_status() {
   Wire.begin(lcd.oled_sda, lcd.oled_scl);
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -64,6 +68,7 @@ bool display_status() {
 int stack_val_t1() { return uxTaskGetStackHighWaterMark(task1); }
 int stack_val_t2() { return uxTaskGetStackHighWaterMark(task2); }
 int stack_val_t3() { return uxTaskGetStackHighWaterMark(task3); }
+int prosseror_usage() {return 100 - ulTaskGetIdleRunTimePercent(); }
 
 void led(int *ptr_delay) {
   digitalWrite(leds, HIGH);
@@ -87,6 +92,9 @@ void lcds(int _param, passing *ptr_pass) {
   display.print("HEAP 3 :");
   display.println(stack_val_t3());
 
+  display.print("CPU : ");
+  display.println( prosseror_usage());
+
   display.setCursor(0, 40);
   display.print("test line : ");
   display.println(ptr_pass->test);
@@ -94,6 +102,7 @@ void lcds(int _param, passing *ptr_pass) {
   display.setCursor(0, 54);
   display.print("Count: ");
   display.println(_param);
+
 
   display.display();
 }
@@ -162,10 +171,12 @@ void setup() {
   xSemaphoreGive(led_gate);
 
   pinMode(leds, OUTPUT);
-  pinMode(button, INPUT_PULLUP);
+  //pinMode(button, INPUT_PULLUP);
 
   // use FALLING to avoid double triggers on mechanical bounce when you only want presses
-  attachInterrupt(digitalPinToInterrupt(button), interupts, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(button), interupts, FALLING);
+
+
 
   if (display_status()) {
     Serial.println("alloc faill");
@@ -200,6 +211,11 @@ void setup() {
     &task3,
     1
   );
+  //setup begine is Begin(int 32,TaskHandle_t,unsigned int 32)
+ 
+  if(my_interupt.begin(button,task3,debauch_t) != 0){
+    Serial.println("fail to allocate the interupt");
+  }
 }
 
 void loop() {
