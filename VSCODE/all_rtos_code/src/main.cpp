@@ -1,7 +1,10 @@
 
 #include <Adafruit_SSD1306.h>
+#include "task.h"
+
 //call my class
 #include "interupt.h"
+
 
 TaskHandle_t task1;
 TaskHandle_t task2;
@@ -72,7 +75,7 @@ bool display_status() {
 int stack_val_t1() { return uxTaskGetStackHighWaterMark(task1); }
 int stack_val_t2() { return uxTaskGetStackHighWaterMark(task2); }
 int stack_val_t3() { return uxTaskGetStackHighWaterMark(task3); }
-int prosseror_usage() {return 100 - ulTaskGetIdleRunTimePercent(); }
+//int prosseror_usage() {return 100 - ulTaskGetIdleRunTimeCounter(); }
 
 void led(int *ptr_delay) {
   digitalWrite(leds, HIGH);
@@ -96,8 +99,8 @@ void lcds(int param,unsigned int interupt_count, passing *ptr_pass) {
   display.print("HEAP 3 :");
   display.println(stack_val_t3());
 
-  display.print("CPU : ");
-  display.println( prosseror_usage());
+  //display.print("CPU : ");
+  //display.println( prosseror_usage());
 
   display.print("INTERUPT : ");
   display.println( interupt_count );
