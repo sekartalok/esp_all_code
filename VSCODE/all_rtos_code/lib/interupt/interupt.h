@@ -2,6 +2,7 @@
 #define interupt_h
 
 #include "Arduino.h"
+#include "gpio.h"
 
 // define abstractions 
 class interupt {
@@ -12,7 +13,7 @@ public:
   // main functions
   static void IRAM_ATTR interupts();
 
-  int begin(int button, TaskHandle_t task3, unsigned int debauch_t);
+  int begin(TaskHandle_t task3, unsigned int debauch_t);
 
 private:
   static unsigned int debauch_t;
