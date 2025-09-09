@@ -3,20 +3,65 @@
 
 using namespace std;
 
+void rf(fs::FS &fs, const string path){
+  if(!fs.exists(path.c_str())){
+    Serial.println("not exists");
+    return;
+
+  }
+  if(!fs.remove(path.c_str())){
+    Serial.println("fail to remove file or not a file");
+    return;
+  }
+}
+
+void rmdir(fs::FS &fs, const string path){
+  if(!fs.exists(path.c_str())){
+    Serial.println("not exists");
+    return;
+
+  }
+  if(!fs.rmdir(path.c_str())){
+    Serial.println("fail to remove dir or not a dir");
+    return;
+  }
+}
+void mkdir(fs::FS &fs, const string path){
+
+  if(fs.exists(path.c_str())){
+    Serial.println("already exists");
+    return;
+  }
+
+  if(!fs.mkdir(path.c_str())){
+    Serial.println("fail to create dir");
+    return;
+  }
+
+  Serial.print(path.c_str());
+  Serial.println(" dir created");
+
+}
 
 void ls(fs::FS &fs ,File root){
+  root.rewindDirectory();
   File file = root.openNextFile();
   if (!file){
     Serial.println("no file / dir");
   }
   while(file){
-   Serial.print("FILE: ");
-   Serial.print(file.name());
+    if (file.isDirectory()){
+      Serial.print("DIR: ");
+      Serial.println(file.name());
+    }else{
+      Serial.print("FILE: ");
+      Serial.println(file.name());
+    }
+   
    file = root.openNextFile();
 
-
-
   }
+  file.close();
 }
 void touch(fs::FS &fs, const string name , const string content){
   auto file = fs.open(name.c_str(), "w");
@@ -69,10 +114,16 @@ void setup() {
   }
   
   File root = LittleFS.open("/");
-  touch(LittleFS,"/hello.txt","Hello World");
-  ls(LittleFS,root);
-  echo(LittleFS,"/hello.txt");
-  nano(LittleFS,"/hello.txt","append balls");
+// touch(LittleFS,"/hello.txt","Hello World");
+// ls(LittleFS,root);
+// echo(LittleFS,"/hello.txt");
+//  nano(LittleFS,"/hello.txt","append ballsa");
+  //mkdir(LittleFS,"/mydirs");
+  //ls(LittleFS,root);
+  //rmdir(LittleFS,"/mydir");
+  //ls(LittleFS,root);
+  //rf(LittleFS,"/hello.txt");
+  //ls(LittleFS,root);
   
 
 }
