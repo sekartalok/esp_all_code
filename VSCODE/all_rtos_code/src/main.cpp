@@ -4,7 +4,7 @@
 
 //call my class
 #include "interupt.h"
-
+#include "gpio.h"
 
 TaskHandle_t task1;
 TaskHandle_t task2;
@@ -34,7 +34,7 @@ static volatile unsigned int count = 0;
 
 static int heapalloc_t1 = 1000;
 static int heapalloc_t2 = 1524;
-const int button = 48;
+//const int button = 48;
 
 static bool ledcon = false;
 static bool reopen = true;
@@ -236,7 +236,7 @@ void setup() {
   );
   //setup begine is Begin(int 32,TaskHandle_t,unsigned int 32)
  
-  if(my_interupt.begin(button,task3,debauch_t) != 0){
+  if(my_interupt.begin(task3,debauch_t) != 0){
     Serial.println("fail to allocate the interupt");
   }
 }

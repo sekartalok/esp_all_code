@@ -22,7 +22,7 @@ void IRAM_ATTR interupt::interupts() {
 }
 
 // Begin function implementation
-int interupt::begin(int button, TaskHandle_t task3, unsigned int debauch_t) {
+int interupt::begin(TaskHandle_t task3, unsigned int debauch_t) {
   // Assign member variables
   interupt::debauch_t = debauch_t;
   interupt::task3 = task3;
