@@ -103,6 +103,10 @@ void nano(fs::FS &fs,const string name, const string content){
   file.close();
 }
 
+void cd (fs::FS &fs,const string dir){
+
+}
+
 
 void setup() {
   Serial.begin(115200);
@@ -124,7 +128,19 @@ void setup() {
     }
   }
   */
-  File root = SD.open("/");
+ // File root = SD.open("/");
+  auto file = SD.open("/test.txt", FILE_WRITE);
+  auto root = SD.open("/");
+  file.println("hello world");
+  file.println("hello world2");
+  file.close();
+  file = SD.open("/test.txt");
+  auto data = file.readString();
+  //data = std::string(file.readString().c_str());
+  Serial.println(data.c_str());
+  file.close();
+  ls(SD,root);
+  
  //touch(SD,"/hello.txt","Hello World");
  //ls(SD,root);
  //echo(SD,"/hello.txt");
@@ -135,7 +151,7 @@ void setup() {
   //ls(LittleFS,root);
   //rf(LittleFS,"/hello.txt");
   //ls(LittleFS,root);
-
+/*
 File file = SD.open("/data/log_interrupt.txt", FILE_READ);
 if (file) {
   String lastLine = "";
@@ -163,8 +179,9 @@ if (file) {
 } else {
   Serial.println("Failed to open file");
 }
+  
 
-
+*/
 
 }
 void loop() {

@@ -5,7 +5,7 @@
 //call my class
 #include "interupt.h"
 #include "gpio.h"
-#include "sd_card.h"
+#include  "sd_lib.h"
 
 TaskHandle_t task1;
 TaskHandle_t task2;
@@ -35,7 +35,7 @@ static SemaphoreHandle_t serial_gate;
 static const int leds = 37;
 static volatile unsigned int count = 0;
 
-static int heapalloc_t1 = 1000;
+static int heapalloc_t1 = 3500;
 static int heapalloc_t2 = 3524;
 //const int button = 48;
 
@@ -49,6 +49,7 @@ static QueueHandle_t interupt_count_queue;
 static const unsigned int interupt_count_queue_max = 12;
 //class
 interupt my_interupt;
+SD_LIB my_sd;
 //ISR VAR
 //static volatile bool interupt = false;
 //static volatile unsigned long last_millis;
@@ -118,60 +119,22 @@ void lcds(int param,unsigned int interupt_count, passing *ptr_pass) {
 
   display.display();
 }
-void write_to_sdcard(int param){ 
-  if(xSemaphoreTake(sd_card_gate,portMAX_DELAY) != pdTRUE){
-    return;
-  }
 
-  if(!SD.cardType()){
+
+void send_sd(std::string data){
+  if(xSemaphoreTake(sd_card_gate, portMAX_DELAY) == pdTRUE){
+    my_sd.mkdir("/log");
+    my_sd.nano("/log/mylog.txt",data,true);
     xSemaphoreGive(sd_card_gate);
-    return;
   }
-
-  if(!SD.exists("/data")){
-  
-    if(!SD.mkdir("/data")){
-      xSemaphoreGive(sd_card_gate);
-      return;
-    }
-  }
-  
-  File root = SD.open("/data");
-  File file = SD.open("/data/log_interrupt.txt",FILE_APPEND);
-
-  if(!file){
-    xSemaphoreGive(sd_card_gate);
-    return; 
-  }
-
-  file.print("interupt count : ");
-  file.println(param);
-  file.close();
-  xSemaphoreGive(sd_card_gate);
-
 }
 
-void read_from_sdcard(){
-  if(xSemaphoreTake(sd_card_gate,portMAX_DELAY)!= pdTRUE){
-    return;
-  }
-  Serial.println("INSIDE FILE :");
-  File file = SD.open("/data/log_interrupt.txt",FILE_READ);
-  if(!file){
+void read_sd(){
+  if(xSemaphoreTake(sd_card_gate, portMAX_DELAY) == pdTRUE){
+    std::string data = my_sd.echo("/log/mylog.txt");
+    Serial.println(data.c_str());
     xSemaphoreGive(sd_card_gate);
-    return;
   }
-  while (file.available()) {
-    // Read one line at a time
-    String line = file.readStringUntil('\n');
-    // Print the line to the Serial Monitor
-    Serial.println(line);
-    Serial.println("");
-  }
-  file.close();
-
-  xSemaphoreGive(sd_card_gate);
-
 }
 
 void fled_in(void *ptr_param) {
@@ -181,7 +144,9 @@ void fled_in(void *ptr_param) {
 
       interupt_count++;
 
-      write_to_sdcard(interupt_count);
+      send_sd("interupt count : " + std::to_string(interupt_count) + "\n");
+
+      
 
       if(xQueueSend(interupt_count_queue , (void *) &interupt_count, 100 ) != pdTRUE){
         Serial.println("queue full or timeout");
@@ -213,6 +178,7 @@ void fled(void *ptr_param) {
   while (1) {
    
     if(xSemaphoreTake(led_gate, 1) == pdPASS){
+      read_sd();
       led(&delay);
       xSemaphoreGive(led_gate);
     }
@@ -233,12 +199,6 @@ void flcd(void *ptr_param) {
   while (1) {
     xQueueReceive(interupt_count_queue, (void * ) &interupt_count, 0);
 
-    if(xSemaphoreTake(serial_gate,portMAX_DELAY)== pdTRUE){
-      read_from_sdcard();
-      xSemaphoreGive(serial_gate);
-    }
-
-
 
     if (xSemaphoreTake(mutex, 0) == pdTRUE) {
       lcds(count,interupt_count, &pass);
@@ -250,17 +210,14 @@ void flcd(void *ptr_param) {
   }
 }
 
-void set_spi_sd(){
-  SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
-  SD.begin(SD_CS);
-}
 
 void setup() {
   Serial.begin(9600);
   delay(500);
 
-  set_spi_sd();
+  my_sd.sd_begin(SD);
   serial_gate = xSemaphoreCreateMutex();
+
  
   sd_card_gate = xSemaphoreCreateBinary();
   xSemaphoreGive(sd_card_gate);
