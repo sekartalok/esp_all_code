@@ -5,6 +5,7 @@
 //call my class
 #include "interupt.h"
 #include "gpio.h"
+#include  "sd_integrate.h"
 
 TaskHandle_t task1;
 TaskHandle_t task2;
@@ -27,13 +28,15 @@ static const lcd_var lcd;
 static passing pass;
 
 static SemaphoreHandle_t mutex;
+static SemaphoreHandle_t sd_card_gate;
 static SemaphoreHandle_t led_gate;
+static SemaphoreHandle_t serial_gate;
 
 static const int leds = 37;
 static volatile unsigned int count = 0;
 
-static int heapalloc_t1 = 1000;
-static int heapalloc_t2 = 1524;
+static int heapalloc_t1 = 3500;
+static int heapalloc_t2 = 3524;
 //const int button = 48;
 
 static bool ledcon = false;
@@ -46,6 +49,7 @@ static QueueHandle_t interupt_count_queue;
 static const unsigned int interupt_count_queue_max = 12;
 //class
 interupt my_interupt;
+SD_INTEGRATE my_sd;
 //ISR VAR
 //static volatile bool interupt = false;
 //static volatile unsigned long last_millis;
@@ -116,12 +120,34 @@ void lcds(int param,unsigned int interupt_count, passing *ptr_pass) {
   display.display();
 }
 
+/*
+void send_sd(std::string data){
+  if(xSemaphoreTake(sd_card_gate, portMAX_DELAY) == pdTRUE){
+    my_sd.mkdir("/log");
+    my_sd.nano("/log/mylog.txt",data,true);
+    xSemaphoreGive(sd_card_gate);
+  }
+}
+
+void read_sd(){
+  if(xSemaphoreTake(sd_card_gate, portMAX_DELAY) == pdTRUE){
+    std::string data = my_sd.echo("/log/mylog.txt");
+    Serial.println(data.c_str());
+    xSemaphoreGive(sd_card_gate);
+  }
+}
+*/
+
 void fled_in(void *ptr_param) {
   unsigned int interupt_count = 0;
   while (1) {
      if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) == pdPASS) {
 
       interupt_count++;
+
+      my_sd.send_sd("interupt count : " + std::to_string(interupt_count) + "\n");
+
+      
 
       if(xQueueSend(interupt_count_queue , (void *) &interupt_count, 100 ) != pdTRUE){
         Serial.println("queue full or timeout");
@@ -151,7 +177,9 @@ void fled_in(void *ptr_param) {
 void fled(void *ptr_param) {
   int delay = *((int *)ptr_param);
   while (1) {
+   
     if(xSemaphoreTake(led_gate, 1) == pdPASS){
+      my_sd.read_sd();
       led(&delay);
       xSemaphoreGive(led_gate);
     }
@@ -173,7 +201,6 @@ void flcd(void *ptr_param) {
     xQueueReceive(interupt_count_queue, (void * ) &interupt_count, 0);
 
 
-
     if (xSemaphoreTake(mutex, 0) == pdTRUE) {
       lcds(count,interupt_count, &pass);
       xSemaphoreGive(mutex);
@@ -184,10 +211,13 @@ void flcd(void *ptr_param) {
   }
 }
 
+
 void setup() {
   Serial.begin(9600);
   delay(500);
 
+  my_sd.begin();
+  serial_gate = xSemaphoreCreateMutex();
   mutex = xSemaphoreCreateMutex();
   led_gate = xSemaphoreCreateBinary();
   xSemaphoreGive(led_gate);
@@ -228,7 +258,7 @@ void setup() {
   xTaskCreatePinnedToCore(
     fled_in,
     "LED_INTER",
-    heapalloc_t1,
+    4500,
     NULL,
     2,
     &task3,
