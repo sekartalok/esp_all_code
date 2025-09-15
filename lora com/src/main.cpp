@@ -21,7 +21,7 @@ void setup() {
   Serial.println("LoRa Module Init...");
   spiLoRa.begin(SCK, MISO, MOSI, NSS);
 
-  int state = radio.begin(850.125);
+  int state = radio.begin(851.125);
   Serial.print("radio.begin() = ");
   Serial.println(state);
 
@@ -31,10 +31,15 @@ void setup() {
   }
 
   // Configure parameters (must match on both ends)
+  // air rate
   radio.setBandwidth(125.0);
   radio.setSpreadingFactor(9);
   radio.setCodingRate(5);
+  //output
   radio.setOutputPower(22);
+  //net id
+  radio.setSyncWord(0x12);
+
 
 
   Serial.println("LoRa ready.");
@@ -43,7 +48,7 @@ void setup() {
 // ----------- SEND FUNCTION -----------
 void sendMessage() {
   String msg = "ESP32->Dongle#" + String(counter++);
-  int state = radio.transmit(msg);
+  int state = radio.transmit(msg,240);
 
   Serial.print("TX state: ");
   Serial.println(state);
@@ -54,7 +59,7 @@ void sendMessage() {
 // ----------- RECEIVE FUNCTION -----------
 void receiveMessage() {
   String str;
-  int state = radio.receive(str);
+  int state = radio.receive(str,240);
 
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println("Packet received!");
@@ -76,6 +81,6 @@ void receiveMessage() {
 // ----------- MAIN LOOP -----------
 void loop() {
   // Uncomment one depending on role
-  //sendMessage();     // For Transmitter
-   receiveMessage();  // For Receiver
+  sendMessage();     // For Transmitter
+  //receiveMessage();  // For Receiver
 }
