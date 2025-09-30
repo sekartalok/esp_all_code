@@ -40,13 +40,12 @@ void setup() {
 }
 void loop() {
   if(dataReady){
-    byte source = myIMU.readAndClearInterrupts();
+     byte source = myIMU.readAndClearInterrupts();
     if(myIMU.checkInterrupt(source,ICM20948_DATA_READY_INT)){
       dma_read();
     }
     dataReady = false;
     myIMU.readAndClearInterrupts();
-
   }
 
 }

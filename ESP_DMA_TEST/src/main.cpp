@@ -1,64 +1,53 @@
 #include <Arduino.h>
-#include <ESP32DMASPIMaster.h>
-#include "helper.h"
-#include "GPIOIMC.h"  // defines SCL, SDA, NCS, ADO, etc.
+#include "ICM2048DMA.h"
 
-static constexpr size_t BUFFER_SIZE = 1;
-static constexpr size_t QUEUE_SIZE  = 256;
+// Pin Definitions (adjust for your board)
 
-ESP32DMASPI::Master master;
-uint8_t* dma_tx_buf;
-uint8_t* dma_rx_buf;
 
-volatile static size_t count_pre_cb  = 0;
-volatile static size_t count_post_cb = 0;
-
-void IRAM_ATTR userTransactionCallback(spi_transaction_t* trans, void* arg) {
-  size_t* counter = (size_t*)arg;
-  *counter += 1;
-}
+// Create ICM20948 DMA object
+ICM20948_DMA imu(0,0, 0, 0);
 
 void setup() {
-  Serial.begin(115200);
-  delay(500);
-
-  dma_tx_buf = master.allocDMABuffer(BUFFER_SIZE);
-  dma_rx_buf = master.allocDMABuffer(BUFFER_SIZE);
-
-  master.setDataMode(SPI_MODE3);
-  master.setFrequency(ONE_MHZ);
-  master.setMaxTransferSize(BUFFER_SIZE);
-  master.setQueueSize(QUEUE_SIZE);
-  master.begin(HSPI, SCL, SDA, ADO, NCS);
-  delay(10);
-
-  master.setUserPreCbAndArg(userTransactionCallback,  (void*)&count_pre_cb);
-  master.setUserPostCbAndArg(userTransactionCallback, (void*)&count_post_cb);
-
-  // Select Bank 0 (write 0 to REG_BANK_SEL)
-  dma_tx_buf[0] = (0x7F & 0x7F); // write
-  dma_tx_buf[1] = 0x00;          // bank 0
-  master.transfer(dma_tx_buf, dma_rx_buf, 2);
-  delay(10);
-
-  Serial.println("ICM-20948 DMA SPI master ready");
+    Serial.begin(115200);
+    delay(2000);
+    
+    Serial.println("\n\n=================================");
+    Serial.println("ICM20948 DMA SPI Test");
+    Serial.println("=================================");
+    
+    Serial.println("\nPin Configuration:");
+    Serial.print("  CS:   "); Serial.println(0);
+    Serial.print("  SCK:  "); Serial.println(0);
+    Serial.print("  MISO: "); Serial.println(0);
+    Serial.print("  MOSI: "); Serial.println(0);
+    
+    // Initialize ICM20948
+    Serial.println("\nInitializing ICM20948...");
+    if (imu.init()) {
+        Serial.println("✓ ICM20948 initialized successfully!");
+        
+        // Check WHO_AM_I
+        uint8_t whoAmI = imu.whoAmI();
+        Serial.print("WHO_AM_I: 0x");
+        Serial.println(whoAmI, HEX);
+        
+        if (whoAmI == 0xEA) {
+            Serial.println("✓ WHO_AM_I correct (0xEA)");
+        } else {
+            Serial.println("✗ WHO_AM_I incorrect!");
+        }
+        delay(100);
+        
+    } else {
+        Serial.println("✗ ICM20948 initialization failed!");
+        Serial.println("Check wiring and power supply");
+        while (1) {
+            delay(1000);
+        }
+    }
+    
 }
 
 void loop() {
-  // Every second, read WHO_AM_I at 0x00
-  static uint32_t last = 0;
-  if (millis() - last > 1000 && master.numTransactionsInFlight() == 0) {
-    last = millis();
 
-    // Read command for 0x00
-    dma_tx_buf[0] = 0x00 | 0x80; // MSB=1 for read
-    dma_tx_buf[1] = 0x00;        // dummy
-
-    master.queue(dma_tx_buf, dma_rx_buf, 2);
-    master.trigger();
-    while (master.numTransactionsInFlight() > 0) { }
-
-    uint8_t whoami = dma_rx_buf[1];
-    Serial.printf("ICM-20948 WHO_AM_I = 0x%02X\n", whoami);
-  }
 }
