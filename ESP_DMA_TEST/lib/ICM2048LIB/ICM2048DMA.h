@@ -239,7 +239,7 @@ enum class OTHERS{
 class ICM20948_DMA {
 protected:
     // DMA SPI interface
-    ESP32DMASPI::Master master;
+    ESP32DMASPI::Master * master;
     uint8_t *dma_tx_buf{nullptr};
     uint8_t *dma_rx_buf{nullptr};
 
@@ -271,21 +271,10 @@ protected:
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
-    ICM20948_DMA(int cs,
-                 int sck,
-                 int miso,
-                 int mosi,
-                 int sda = -1,
-                 int scl = -1,
-                 int ado = -1)
-      : csPin(cs),
-        sckPin(sck),
-        misoPin(miso),
-        mosiPin(mosi),
-        sdaPin(sda),
-        sclPin(scl),
-        adoPin(ado) {}
-
+   ICM20948_DMA(int cs, int sck, int miso, int mosi, 
+                 int sda = -1, int scl = -1, int ado = -1);
+    
+    ~ICM20948_DMA();
     // Initialization and configuration
     bool init();
     void setSPIClockSpeed(unsigned long clock);
