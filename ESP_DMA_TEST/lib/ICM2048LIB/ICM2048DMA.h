@@ -248,9 +248,6 @@ protected:
     int sckPin;
     int misoPin;
     int mosiPin;
-    int sdaPin;    // optional I2C SDA (-1 if unused)
-    int sclPin;    // optional I2C SCL (-1 if unused)
-    int adoPin;    // optional I2C address pin (-1 if unused)
 
     // Bank and data buffer
     uint8_t currentBank{0};
@@ -271,9 +268,8 @@ protected:
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
-   ICM20948_DMA(int cs, int sck, int miso, int mosi, 
-                 int sda = -1, int scl = -1, int ado = -1);
-    
+   ICM20948_DMA(int cs, int sck, int miso, int mosi);
+   
     ~ICM20948_DMA();
     // Initialization and configuration
     bool init();
