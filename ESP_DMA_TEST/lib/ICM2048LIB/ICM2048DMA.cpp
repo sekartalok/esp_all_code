@@ -16,6 +16,34 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
         delayMicroseconds(10);  // Bank switch settling time
     }
 }
+void ICM20948_DMA::reset_ICM20948() {
+    // Switch to Bank 0 (PWR_MGMT_1 is in Bank 0)
+    switchBank(0);
+    
+    // Prepare reset command in DMA buffer
+    dma_tx_buf[0] = ICM20948_PWR_MGMT_1 & 0x7F;  // Write operation (MSB=0)
+    dma_tx_buf[1] = static_cast<uint8_t>(REGISTER_BITS::ICM20948_RESET);  // 0x80 reset bit
+    
+    // Execute blocking DMA transfer (2 bytes: register + data)
+    master.transfer(dma_tx_buf, nullptr, 2);
+    
+    delay(10);  // Wait for internal registers to reset
+}
+
+
+void ICM20948_DMA::writeRegister8(uint8_t bank, uint8_t reg, uint8_t val) {
+    // Switch to correct register bank first
+    switchBank(bank);
+    
+    // Prepare 2-byte command in DMA buffer
+    dma_tx_buf[0] = reg & 0x7F;  // Clear MSB for write operation
+    dma_tx_buf[1] = val;
+    
+    // Execute blocking DMA transfer
+    master.transfer(dma_tx_buf, nullptr, 2);
+    
+    delayMicroseconds(5);  // Register write settling time
+}
 
 
 uint8_t ICM20948_DMA::readRegister8(uint8_t bank, uint8_t reg) {
