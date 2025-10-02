@@ -1,8 +1,5 @@
 #include "ICM2048DMA.h"
 
-
-/************ Basic Settings ************/ 
-
 void ICM20948_DMA::sleep(bool sleep) {
     uint8_t temp = readRegister8(0, ICM20948_PWR_MGMT_1);
     if(sleep) {
@@ -16,55 +13,57 @@ void ICM20948_DMA::sleep(bool sleep) {
 void ICM20948_DMA::switchBank(uint8_t newBank) {
     if (newBank != currentBank) {
         currentBank = newBank;
-        
-        digitalWrite(csPin, LOW);
+
         master->beginTransaction(spi_setting);
+        digitalWrite(csPin, LOW);
 
-        master->transfer(static_cast<uint8_t>(ICM20948_All_Bank::ICM20948_REG_BANK_SEL));
-        master->transfer(newBank << 4);
-        
-        master->endTransaction();
+        master->transfer(static_cast<uint8_t>(ICM20948_All_Bank::ICM20948_REG_BANK_SEL) & ICM20948_WRITE_MASKING_BIT);
+        master->transfer((newBank & ICM20948_BANK_MASKING_BIT ) << 4);
+
         digitalWrite(csPin, HIGH);
+        master->endTransaction();
 
-        delay(5);
+        delayMicroseconds(10);
     }
 }
 
 void ICM20948_DMA::reset_ICM20948() {
-    writeRegister8(0,ICM20948_PWR_MGMT_1,static_cast<uint8_t>(REGISTER_BITS::ICM20948_RESET));
-    delay(5);
+    writeRegister8(0, ICM20948_PWR_MGMT_1,
+                   static_cast<uint8_t>(REGISTER_BITS::ICM20948_RESET));
+    delay(100); // 100 ms, not 5 ms
 }
 
 void ICM20948_DMA::writeRegister8(uint8_t bank, uint8_t reg, uint8_t val) {
-
     switchBank(bank);
 
-    digitalWrite(csPin,LOW);
     master->beginTransaction(spi_setting);
+    digitalWrite(csPin, LOW);
 
-    master->transfer(reg & ICM20948_WRITE_MASKING_BIT);
+    master->transfer(reg & ICM20948_WRITE_MASKING_BIT); // write mask
     master->transfer(val);
 
+    digitalWrite(csPin, HIGH);
     master->endTransaction();
-    digitalWrite(csPin,HIGH);
-}
 
+    delayMicroseconds(5);
+}
 
 uint8_t ICM20948_DMA::readRegister8(uint8_t bank, uint8_t reg) {
     switchBank(bank);
-    
-    uint8_t dummy =0x00;
 
-    digitalWrite(csPin,LOW);
+    uint8_t value = 0;
+
     master->beginTransaction(spi_setting);
+    digitalWrite(csPin, LOW);
 
-    master->transfer(reg | ICM20948_READ_MASKING_BIT);
-    dummy = master->transfer(0x00);
+    master->transfer(reg | ICM20948_READ_MASKING_BIT); // read mask
+    value = master->transfer(0x00);
 
+    digitalWrite(csPin, HIGH);
     master->endTransaction();
-    digitalWrite(csPin,HIGH);
-    
-    return dummy;  
+
+    delayMicroseconds(5);
+    return value;
 }
 
 uint8_t ICM20948_DMA::whoAmI() {
@@ -72,40 +71,42 @@ uint8_t ICM20948_DMA::whoAmI() {
 }
 
 bool ICM20948_DMA::init() {
-    //ready the CS PIN
     pinMode(csPin, OUTPUT);
     digitalWrite(csPin, HIGH);
 
-    Serial.print("TEST");
-    //set the spi setting on speed
-    spi_setting = SPISettings(7000000, MSBFIRST, SPI_MODE0);   
+    spi_setting = SPISettings(7000000, MSBFIRST, SPI_MODE0);
 
-    //set current bank to default
-    currentBank = 0x00;
-   
-    reset_ICM20948();
-    delay(5);
+    currentBank = 0xFF; // force first switch
+
+    reset_ICM20948();   // one reset only
+    delay(100);
 
     uint8_t tries = 0;
-    while ((whoAmI() != static_cast<uint8_t>(OTHERS::ICM20948_WHO_AM_I_CONTENT)) && (tries < 5)) {
-        reset_ICM20948();
-        delay(200);
-        Serial.println("HELLO");
+    uint8_t who = 0;
+    while (tries < 5) {
+        who = whoAmI();
+        if (who == static_cast<uint8_t>(OTHERS::ICM20948_WHO_AM_I_CONTENT)) break;
+        delay(100);
         tries++;
     }
-    if (tries == 5 ) {
+
+    Serial.print("WHO_AM_I = 0x");
+    Serial.println(who, HEX);
+
+    if (who != static_cast<uint8_t>(OTHERS::ICM20948_WHO_AM_I_CONTENT)) {
         return false;
     }
 
-    // Initialize offsets and scaling
+    // Offsets and scaling
     accOffsetVal = {0.0f, 0.0f, 0.0f};
     gyrOffsetVal = {0.0f, 0.0f, 0.0f};
     accRangeFactor = 1;
     gyrRangeFactor = 1;
 
-    // Wake up and align ODR
+    // Wake and align ODR
     sleep(false);
-    writeRegister8(2, static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
+    writeRegister8(2,
+        static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
 
     return true;
 }
