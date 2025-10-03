@@ -1,208 +1,105 @@
 #include "ICM2048DMA.h"
 
-ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(ado), sdaPin(sda), csPin(cs){}
+ICM20948_DMA::ICM20948_DMA(int sck, int miso, int mosi, int cs) {
+    dma_tx = nullptr;
+    dma_rx = nullptr;
+    master.begin(HSPI, sck, miso, mosi, cs);
+}
 
-// Destructor
 ICM20948_DMA::~ICM20948_DMA() {
-    if (dma_tx_buf) {
-        heap_caps_free(dma_tx_buf);
-        dma_tx_buf = nullptr;
-    }
-    if (dma_rx_buf) {
-        heap_caps_free(dma_rx_buf);
-        dma_rx_buf = nullptr;
-    }
-}
-// Main init 
-
-bool ICM20948_DMA::init() {
-    pinMode(csPin, OUTPUT);
-    digitalWrite(csPin, HIGH);
-
-    dma_tx_buf = master.allocDMABuffer(32);
-    dma_rx_buf = master.allocDMABuffer(32);
-    if (!dma_tx_buf || !dma_rx_buf) {
-        Serial.println("DMA buffer allocation failed");
-        return false;
-    }
-
-    master.setDataMode(SPI_MODE0);
-    master.setFrequency(1000000);   // safe startup
-    master.setMaxTransferSize(32);
-    master.setQueueSize(1);
-
-    if (!master.begin(HSPI, sclPin, adoPin, sdaPin, csPin)) {
-        Serial.println("master.begin() failed");
-        return false;
-    }
-
-    delay(200); // let spi_master_task set up its queues
-
-    reset_ICM20948();   
-    delay(100);
-
-    uint8_t tries = 0;
-    uint8_t who = 0;
-    while (tries < 5) {
-        who = whoAmI();
-        if (who == static_cast<uint8_t>(OTHERS::ICM20948_WHO_AM_I_CONTENT)) break;
-        delay(100);
-        tries++;
-    }
-
-    if (who != static_cast<uint8_t>(OTHERS::ICM20948_WHO_AM_I_CONTENT)) {
-        Serial.println("WHO_AM_I mismatch!");
-        return false;
-    }
-
-    accRangeFactor = 1;
-    gyrRangeFactor = 1;
-
-    sleep(false);
-    writeRegister8(2, static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
-
-    return true;
+    if (dma_tx) free(dma_tx);
+    if (dma_rx) free(dma_rx);
 }
 
-/* READ AND WRITE MASTER */
+void ICM20948_DMA::spiTransfer(size_t len) {
+    size_t aligned_len = (len + 3) & ~0x03; // align 4 for DMA
+    master.transfer(dma_tx, dma_rx, aligned_len);
+}
+
+void ICM20948_DMA::switchBank(uint8_t newBank) {
+    if (newBank != currentBank) {
+        currentBank = newBank;
+        dma_tx[0] = REG_BANK_SEL & 0x7F;
+        dma_tx[1] = (currentBank & 0x03) << 4;
+        spiTransfer(2);
+    }
+}
 
 void ICM20948_DMA::writeRegister8(uint8_t bank, uint8_t reg, uint8_t val) {
     switchBank(bank);
-
-    dma_tx_buf[0] = reg & ICM20948_WRITE_MASKING_BIT ;
-    dma_tx_buf[1] = val;
-
+    dma_tx[0] = reg & 0x7F;
+    dma_tx[1] = val;
     spiTransfer(2);
-    delayMicroseconds(5);
 }
 
 uint8_t ICM20948_DMA::readRegister8(uint8_t bank, uint8_t reg) {
     switchBank(bank);
-
-    dma_tx_buf[0]= reg | ICM20948_READ_MASKING_BIT;
-    dma_tx_buf[1] = 0x00;
+    dma_tx[0] = reg | 0x80;
+    dma_tx[1] = 0x00;
     spiTransfer(2);
-
-
-    delayMicroseconds(5);
-    return dma_rx_buf[1];
-
-}
- 
-
-
-/* utils */
-uint8_t ICM20948_DMA::whoAmI() {
-    return readRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_WHO_AM_I));
+    return dma_rx[1];
 }
 
-void ICM20948_DMA::setAccDLPF(ICM20948_dlpf dlpf){
-
-    uint8_t temp = readRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::ACCEL_CONFIG));
-
-    if(dlpf != ICM20948_DLPF_OFF){
-        temp |= 0x01;
-        temp &= 0xC7;
-        temp |= (dlpf<<3);
-
-    }
-    else{
-        temp &= 0xFE;
-    }
-    writeRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::ACCEL_CONFIG),temp);
-
+void ICM20948_DMA::readRegisters(uint8_t bank, uint8_t reg, uint8_t *buf, size_t len) {
+    switchBank(bank);
+    dma_tx[0] = reg | 0x80;
+    for (size_t i = 1; i <= len; i++) dma_tx[i] = 0x00;
+    spiTransfer(len + 1);
+    for (size_t i = 0; i < len; i++) buf[i] = dma_rx[i + 1];
 }
 
-void ICM20948_DMA::spiTransfer(size_t len){
-    size_t AlignedLen = (len + 3) & ~0x03;
-    master.transfer(dma_tx_buf,dma_rx_buf,AlignedLen);
-}
+bool ICM20948_DMA::init_ICM20948() {
+    writeRegister8(0, PWR_MGMT_1, RESET);
+    delay(50);
 
-
-/* SENSOR SET RANGE */
-
-void ICM20948_DMA::setAccRange(ICM20948_accRange accRange){
-
-    uint8_t temp = readRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::ACCEL_CONFIG));
-    temp &= ~(0x06);
-    temp |= (accRange<<1);
-    writeRegister8(2 , static_cast<uint8_t>(ICM20948_Bank_2_Registers::ACCEL_CONFIG) , temp);
-    accRangeFactor = 1<<accRange;
-
-
-}
-
-void ICM20948_DMA::setGyrRange(ICM20948_gyroRange  gyrRange){
-
-    uint8_t temp = readRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::GYRO_CONFIG_1));
-    temp &= ~(0x06);
-    temp |= (gyrRange<<1);
-    writeRegister8(2 , static_cast<uint8_t>(ICM20948_Bank_2_Registers::GYRO_CONFIG_1) , temp);
-    gyrRangeFactor = 1<<gyrRange;
-
-
-}
-
-
-
-
-/* SENSOR PWR */
-
-void ICM20948_DMA::sleep(bool sleep) {
-    uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_1));
-    if(sleep) {
-        temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_SLEEP);
-    }else{
-        temp &= ~static_cast<uint8_t>(REGISTER_BITS::ICM20948_SLEEP);
-    }
-    writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_1), temp);
-}
-
-void ICM20948_DMA::enableAcc(bool enAcc){
-    uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_2));
-    if(enAcc){
-
-        temp &= ~static_cast<uint8_t>(REGISTER_BITS::ICM20948_ACC_EN);
-
-    }else{
-
-    temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_ACC_EN);
+    uint8_t who = readRegister8(0, WHO_AM_I);
+    if (who != WHO_AM_I_VALUE) {
+        Serial.printf("WHO_AM_I mismatch: 0x%02X\n", who);
+        return false;
     }
 
-    writeRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_2),temp);
+    uint8_t pwr_mgmt_1 = readRegister8(0, PWR_MGMT_1);
+    writeRegister8(0, PWR_MGMT_1, pwr_mgmt_1 & ~SLEEP);
+
+    writeRegister8(2, ODR_ALIGN_EN, 1);
+
+    return true;
 }
 
-void ICM20948_DMA::enableGyr(bool enGyr){
-    uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_2));
-    if(enGyr){
+bool ICM20948_DMA::begin() {
+    dma_tx = master.allocDMABuffer(32);
+    dma_rx = master.allocDMABuffer(32);
 
-        temp &= ~static_cast<uint8_t>(REGISTER_BITS::ICM20948_GYR_EN);
+    master.setDataMode(SPI_MODE0);
+    master.setFrequency(1000000);
+    master.setMaxTransferSize(32);
+    master.setQueueSize(1);
 
-    }else{
+    delay(100);
 
-        temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_ACC_EN);
+    return init_ICM20948();
+}
+
+void ICM20948_DMA::readAllData(uint8_t *data) {
+    switchBank(0);
+    dma_tx[0] = ACCEL_OUT | 0x80;
+    for (int i = 1; i <= 20; i++) dma_tx[i] = 0x00;
+
+    spiTransfer(21);
+
+    for (int i = 0; i < 20; i++) {
+        data[i] = dma_rx[i + 1];
     }
-}
 
-
-
-/* SUPPORT */
-
-
-void ICM20948_DMA::reset_ICM20948() {
-    writeRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_1),
-                   static_cast<uint8_t>(REGISTER_BITS::ICM20948_RESET));
-    delay(100); 
-}
-void ICM20948_DMA::switchBank(uint8_t newBank) {
-    if (newBank != currentBank) {
-        currentBank = newBank;
-
-        dma_tx_buf[0] = static_cast<uint8_t>(ICM20948_All_Bank::ICM20948_REG_BANK_SEL) & ICM20948_WRITE_MASKING_BIT;
-        dma_tx_buf[1] = ( newBank & ICM20948_BANK_MASKING_BIT ) << 4;
-
-        spiTransfer(2);
-
-        delayMicroseconds(10);
-    }
+    // parse into class fields
+    ax = (data[0] << 8) | data[1];
+    ay = (data[2] << 8) | data[3];
+    az = (data[4] << 8) | data[5];
+    temp = (data[6] << 8) | data[7];
+    gx = (data[8] << 8) | data[9];
+    gy = (data[10] << 8) | data[11];
+    gz = (data[12] << 8) | data[13];
+    mx = (data[14] << 8) | data[15];
+    my = (data[16] << 8) | data[17];
+    mz = (data[18] << 8) | data[19];
 }
