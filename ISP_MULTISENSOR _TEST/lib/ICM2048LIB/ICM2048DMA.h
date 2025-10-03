@@ -90,7 +90,7 @@ enum class ICM20948_CONSTANTS : uint8_t{
     AK09916_ADDRESS     = 0x0C
 };
 
-enum ICM20948_Bank0_Registers {
+enum class ICM20948_Bank0_Registers : uint8_t {
     ICM20948_WHO_AM_I            = 0x00,
     ICM20948_USER_CTRL           = 0x03,
     ICM20948_LP_CONFIG           = 0x05,
@@ -196,7 +196,7 @@ enum class AK09916_Registers : uint8_t {
     AK09916_CNTL_3   = 0x32
 };
 
-enum class REGISTER_BITS {
+enum class REGISTER_BITS : uint8_t {
     // Power Management Bits
     ICM20948_RESET              = 0x80,
     ICM20948_SLEEP              = 0x40,
@@ -241,6 +241,9 @@ enum class OTHERS{
 
 class ICM20948_DMA {
 protected:
+
+
+    const uint8_t buffer_max = 20;
     // DMA SPI interface
     SPIClass* master;
     SPISettings spi_setting;
@@ -252,12 +255,12 @@ protected:
 
 
     // Bank and data buffer
-    uint8_t currentBank{0};
+    uint8_t currentBank{0xFF};
     uint8_t buffer[20];
 
     // Offsets & scaling
-    xyzFloat accOffsetVal{};
-    xyzFloat gyrOffsetVal{};
+    //xyzFloat accOffsetVal{};
+    //xyzFloat gyrOffsetVal{};
     uint8_t accRangeFactor{1};
     uint8_t gyrRangeFactor{1};
 
@@ -278,14 +281,17 @@ public:
     void enableAcc(bool enAcc);
     void setAccRange(ICM20948_accRange accRange);
     void enableGyr(bool enGyr);
-    void setGyrRange(ICM20948_gyroRange range);
+    void setGyrRange(ICM20948_gyroRange gyrRange);
     void sleep(bool sleep);
+    void setAccDLPF(ICM20948_dlpf dlpf);
 
     // Data acquisition
     void readSensor();
     void getAccRawValues(xyzFloat *accRawVal);
     void getGyrRawValues(xyzFloat *gyrRawVal);
     float getTemperature();
+
+
 
     //check
     uint8_t whoAmI();

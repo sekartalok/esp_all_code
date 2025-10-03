@@ -3,11 +3,10 @@
 #define ICM_2048
 #include <Arduino.h>  
 #include "xyzFloat.h"
+#include "ESP32DMASPIMaster.h"
 
-#ifndef ESP32DMA_INCLUDED
-#define ESP32DMA_INCLUDED
-#include <ESP32DMASPIMaster.h>
-#endif
+
+
 
 enum class ICM20948_CYCLE : uint8_t{
     ICM20948_NO_CYCLE              = 0x00,
@@ -22,6 +21,11 @@ typedef enum ICM20948_INT_PIN_POL {
     ICM20948_ACT_HIGH, ICM20948_ACT_LOW
 } ICM20948_intPinPol;
 
+typedef enum MASKING_BIT{
+    ICM20948_WRITE_MASKING_BIT = 0x7F,
+    ICM20948_READ_MASKING_BIT  = 0x80,
+    ICM20948_BANK_MASKING_BIT  = 0x03
+}ICM20948_BitMasking;
 
 enum class ICM20948_INT_TYPE : uint8_t{
     ICM20948_FSYNC_INT      = 0x01,
@@ -87,7 +91,7 @@ enum class ICM20948_CONSTANTS : uint8_t{
     AK09916_ADDRESS     = 0x0C
 };
 
-enum ICM20948_Bank0_Registers {
+enum class ICM20948_Bank0_Registers : uint8_t {
     ICM20948_WHO_AM_I            = 0x00,
     ICM20948_USER_CTRL           = 0x03,
     ICM20948_LP_CONFIG           = 0x05,
@@ -193,7 +197,7 @@ enum class AK09916_Registers : uint8_t {
     AK09916_CNTL_3   = 0x32
 };
 
-enum class REGISTER_BITS {
+enum class REGISTER_BITS : uint8_t {
     // Power Management Bits
     ICM20948_RESET              = 0x80,
     ICM20948_SLEEP              = 0x40,
@@ -245,10 +249,7 @@ protected:
 
     // Pin assignments
     int csPin;
-    int sckPin;
-    int misoPin;
-    int mosiPin;
-
+    
     // Bank and data buffer
     uint8_t currentBank{0};
     uint8_t buffer[20];
@@ -268,7 +269,7 @@ protected:
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
-   ICM20948_DMA(int cs, int sck, int miso, int mosi);
+   ICM20948_DMA(ESP32DMASPI::Master * master, int cs);
    
     ~ICM20948_DMA();
     // Initialization and configuration
