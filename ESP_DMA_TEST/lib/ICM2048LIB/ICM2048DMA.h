@@ -243,12 +243,15 @@ enum class OTHERS{
 class ICM20948_DMA {
 protected:
     // DMA SPI interface
-    ESP32DMASPI::Master * master;
+    ESP32DMASPI::Master master;
     uint8_t *dma_tx_buf{nullptr};
     uint8_t *dma_rx_buf{nullptr};
 
     // Pin assignments
     int csPin;
+    int sdaPin;
+    int sclPin;
+    int adoPin;
     
     // Bank and data buffer
     uint8_t currentBank{0};
@@ -266,12 +269,13 @@ protected:
     uint8_t readRegister8(uint8_t bank, uint8_t reg);
     void readAllData(uint8_t *data);
     void reset_ICM20948();
+    void spiTransfer(size_t len);
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
-   ICM20948_DMA(ESP32DMASPI::Master * master, int cs);
-   
-    ~ICM20948_DMA();
+   ICM20948_DMA(int scl,int ado,int sda,int cs);
+   ~ICM20948_DMA();
+
     // Initialization and configuration
     bool init();
     void setSPIClockSpeed(unsigned long clock);
@@ -279,6 +283,8 @@ public:
     void setAccRange(ICM20948_accRange accRange);
     void enableGyr(bool enGyr);
     void setGyrRange(ICM20948_gyroRange range);
+    void setAccDLPF(ICM20948_dlpf dlpf);
+    void sleep(bool sleep);
 
     // Data acquisition
     void readSensor();

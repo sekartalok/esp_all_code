@@ -18,7 +18,7 @@ constexpr uint8_t ICM20948_WHO_AM_I       = 0x00;
 constexpr uint8_t ICM20948_PWR_MGMT_1     = 0x06;
 constexpr uint8_t ICM20948_WHO_AM_I_VALUE = 0xEA;
 
-constexpr uint8_t ICM20948_ACCEL_OUT      = 0x2D; // start of accel/gyro/temp burst read
+constexpr uint8_t ICM20948_ACCEL_OUT      = 0x2D; 
 constexpr uint8_t ICM20948_ODR_ALIGN_EN   = 0x09;
 
 constexpr uint8_t ICM20948_RESET = 0x80;
