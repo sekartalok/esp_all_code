@@ -45,8 +45,8 @@ static QueueHandle_t s_in_flight_mailbox_handle {NULL};
 
 using spi_master_user_cb_t = std::function<void(spi_transaction_t*, void*)>;
 
-void spi_master_pre_cb(spi_transaction_t* trans);
-void spi_master_post_cb(spi_transaction_t* trans);
+static void spi_master_pre_cb(spi_transaction_t* trans);
+static void spi_master_post_cb(spi_transaction_t* trans);
 struct spi_master_context_t
 {
     spi_device_interface_config_t if_cfg {
@@ -118,7 +118,7 @@ struct spi_master_cb_user_context_t
     } post;
 };
 
-void IRAM_ATTR spi_master_pre_cb(spi_transaction_t* trans)
+static void IRAM_ATTR spi_master_pre_cb(spi_transaction_t* trans)
 {
     spi_master_cb_user_context_t *user_ctx = static_cast<spi_master_cb_user_context_t*>(trans->user);
     if (user_ctx->pre.user_cb) {
@@ -126,7 +126,7 @@ void IRAM_ATTR spi_master_pre_cb(spi_transaction_t* trans)
     }
 }
 
-void IRAM_ATTR spi_master_post_cb(spi_transaction_t* trans)
+static void IRAM_ATTR spi_master_post_cb(spi_transaction_t* trans)
 {
     spi_master_cb_user_context_t *user_ctx = static_cast<spi_master_cb_user_context_t*>(trans->user);
     if (user_ctx->post.user_cb) {
@@ -134,7 +134,7 @@ void IRAM_ATTR spi_master_post_cb(spi_transaction_t* trans)
     }
 }
 
-void spi_master_task(void *arg)
+static void spi_master_task(void *arg)
 {
     ESP_LOGD(TAG, "spi_master_task start");
 
