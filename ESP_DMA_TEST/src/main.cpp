@@ -16,10 +16,13 @@ void setup() {
     } else {
         Serial.println("ICM20948 FAIL");
         while (1) delay(1000);
+        
     }
+   
 }
 
 void loop() {
+    Serial.println(imu.WhoimI());
     uint8_t raw[20];
     imu.readAllData(raw);
 

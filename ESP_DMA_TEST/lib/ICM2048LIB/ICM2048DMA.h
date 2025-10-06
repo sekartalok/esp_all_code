@@ -28,6 +28,7 @@ public:
     int16_t getMagX() { return mx; }
     int16_t getMagY() { return my; }
     int16_t getMagZ() { return mz; }
+    uint8_t WhoimI();
 
 private:
     Master master;
@@ -51,6 +52,7 @@ private:
     static constexpr uint8_t SLEEP          = 0x40;
 
     // low level
+    
     void spiTransfer(size_t len);
     void switchBank(uint8_t newBank);
     void writeRegister8(uint8_t bank, uint8_t reg, uint8_t val);

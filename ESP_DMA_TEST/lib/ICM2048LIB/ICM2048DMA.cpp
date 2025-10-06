@@ -12,10 +12,14 @@ ICM20948_DMA::~ICM20948_DMA() {
 }
 
 void ICM20948_DMA::spiTransfer(size_t len) {
-    size_t aligned_len = (len + 3) & ~0x03; // align 4 for DMA
-    master.transfer(dma_tx, dma_rx, aligned_len);
+    size_t aligned_len = (len + 3) & ~0x03; // 4byte is missing SPI SLAVE
+    master.queue(dma_tx, dma_rx, aligned_len);
+    master.trigger();
 }
+uint8_t ICM20948_DMA::WhoimI(){
+    return readRegister8(0, WHO_AM_I);
 
+}
 void ICM20948_DMA::switchBank(uint8_t newBank) {
     if (newBank != currentBank) {
         currentBank = newBank;
@@ -52,11 +56,13 @@ bool ICM20948_DMA::init_ICM20948() {
     writeRegister8(0, PWR_MGMT_1, RESET);
     delay(50);
 
-    uint8_t who = readRegister8(0, WHO_AM_I);
+    uint8_t who = WhoimI();
     if (who != WHO_AM_I_VALUE) {
         Serial.printf("WHO_AM_I mismatch: 0x%02X\n", who);
         return false;
     }
+    Serial.printf("WORKING: 0x%02X\n", WhoimI());
+
 
     uint8_t pwr_mgmt_1 = readRegister8(0, PWR_MGMT_1);
     writeRegister8(0, PWR_MGMT_1, pwr_mgmt_1 & ~SLEEP);
