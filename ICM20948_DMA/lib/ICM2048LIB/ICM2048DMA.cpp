@@ -3,14 +3,20 @@
 ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(ado), sdaPin(sda), csPin(cs){
     //pinMode(csPin, OUTPUT);
     //digitalWrite(csPin, HIGH);
-    master.begin(HSPI, sclPin, adoPin, sdaPin, csPin);
-    dma_tx_buf = master.allocDMABuffer(32);
-    dma_rx_buf = master.allocDMABuffer(32);
+    master = new ESP32DMASPI::Master();
+    master->begin(HSPI, sclPin, adoPin, sdaPin, csPin);
+    dma_tx_buf = master->allocDMABuffer(32);
+    dma_rx_buf = master->allocDMABuffer(32);
 
 }
 
 // Destructor
 ICM20948_DMA::~ICM20948_DMA() {
+    if (master) {
+        master->end();   
+        delete master;   
+        master = nullptr;
+    }
     if (dma_tx_buf) {
         heap_caps_free(dma_tx_buf);
         dma_tx_buf = nullptr;
@@ -25,10 +31,10 @@ ICM20948_DMA::~ICM20948_DMA() {
 bool ICM20948_DMA::init() {
 
 
-    master.setDataMode(SPI_MODE0);
-    master.setFrequency(1000000);  
-    master.setMaxTransferSize(32);
-    master.setQueueSize(1);
+    master->setDataMode(SPI_MODE0);
+    master->setFrequency(1000000);  
+    master->setMaxTransferSize(32);
+    master->setQueueSize(1);
 
     delay(200);
 
@@ -61,6 +67,29 @@ bool ICM20948_DMA::init() {
 
     return true;
 }
+/* recycle */
+bool ICM20948_DMA::recycle(){
+    if (master) {
+        master->end();  
+        delete master;   
+        master = nullptr;
+    }
+    if (dma_tx_buf) {
+        heap_caps_free(dma_tx_buf);
+        dma_tx_buf = nullptr;
+    }
+    if (dma_rx_buf) {
+        heap_caps_free(dma_rx_buf);
+        dma_rx_buf = nullptr;
+    }
+    master = new ESP32DMASPI::Master();
+    master->begin(HSPI, sclPin, adoPin, sdaPin, csPin);
+    dma_tx_buf = master->allocDMABuffer(32);
+    dma_rx_buf = master->allocDMABuffer(32);
+    return init();
+
+}
+
 
 /* READ AND WRITE MASTER */
 
@@ -152,8 +181,8 @@ void ICM20948_DMA::setAccDLPF(ICM20948_dlpf dlpf){
 
 void ICM20948_DMA::spiTransfer(size_t len){
     size_t aligned_len = (len + 3) & ~0x03; // 4byte is missing SPI SLAVE
-    master.queue(dma_tx_buf, dma_rx_buf, aligned_len);
-    master.trigger();
+    master->queue(dma_tx_buf, dma_rx_buf, aligned_len);
+    master->trigger();
 }
 
 
@@ -218,7 +247,7 @@ void ICM20948_DMA::enableGyr(bool enGyr){
 
     }else{
 
-        temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_ACC_EN);
+        temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_GYR_EN);
     }
 }
 
@@ -243,4 +272,113 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
 
         delayMicroseconds(10);
     }
+}
+
+/* magneto meter */
+bool ICM20948_DMA::init_AK09916(){
+    bool succes = false;
+    reset_ICM20948();
+    enableI2CMaster();
+    reset_AK09916();
+    sleep(false);
+    writeRegister8(2, static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
+    uint8_t trying = 0;
+    while (!succes && trying < 10){
+        delay(10);
+        enableI2CMaster();
+        delay(10);
+
+        uint16_t who = whoAmI_AK09916();
+        if(! ((who == AK09916_WHO_AM_I_1) || (who == AK09916_WHO_AM_I_2))){
+            resetI2CMaster();
+            succes = false;
+            trying++;
+            
+
+        }else{
+            succes = true;
+            break;
+        }
+    }
+    if(succes){
+        //default mode
+        setMagMode(AK09916_CONT_MODE_100HZ);
+
+    }
+    return succes;
+
+
+}
+void ICM20948_DMA::reset_AK09916(){
+    AK09916_writeRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_CNTL_3 ),0x01);
+    delay(100);
+    
+}
+
+uint16_t ICM20948_DMA::whoAmI_AK09916(){
+    uint8_t ADDH_byte = AK09916_readRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_WIA_1));
+    uint8_t ADDL_byte = AK09916_readRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_WIA_2));
+    return (ADDH_byte<<8) | ADDL_byte;
+
+}
+void ICM20948_DMA::setMagMode(AK09916_opMode mode){
+    AK09916_writeRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_CNTL_2 ),mode);
+    if(mode != AK09916_PWR_DOWN){
+        AK09916_enableMagRead(static_cast<uint8_t>(AK09916_Registers::AK09916_HXL ),0x08);
+
+    }
+
+}
+
+/* I2C MASTER */
+
+void ICM20948_DMA::enableI2CMaster(){
+    writeRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),
+    static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_MST_EN));
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_MST_CTRL),0x05);//set clock I2C
+}
+
+void ICM20948_DMA::resetI2CMaster(){
+    uint8_t temp = readRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL));
+    temp |= ICM20948_I2C_MST_RST ;
+    writeRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),temp);
+    
+}
+
+/* I2C READ WRITE FOR AK09916 */
+uint8_t ICM20948_DMA::AK09916_readRegister8(uint8_t reg){
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
+    static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | static_cast<uint8_t>(REGISTER_BITS::AK09916_READ));
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG ),reg);//tell register read
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL),static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN));
+
+    //waiting register to clear and avoid run away code
+    unsigned long int startMillis = millis(); //avoid overflow
+    while ((readRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL)) & static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN))
+    && (millis() - startMillis < 100));
+    return readRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DI));
+
+}
+
+void ICM20948_DMA::AK09916_writeRegister8(uint8_t reg , uint8_t val){
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS));
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DO),val);
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG ),reg); //tell register write 
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL),static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN));
+
+    //waiting register to clear and avoid run away code
+    unsigned long int startMillis = millis(); //avoid overflow
+    while ((readRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL)) & static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN))
+    && (millis() - startMillis < 100));
+
+}
+
+/*mag data read enable*/
+void ICM20948_DMA::AK09916_enableMagRead(uint8_t reg ,uint8_t byte){
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
+    static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | static_cast<uint8_t>(REGISTER_BITS::AK09916_READ));
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG ),reg);
+    writeRegister8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL),static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN) | byte);
+    delay(12);
+
 }

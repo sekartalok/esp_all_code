@@ -60,6 +60,18 @@ private:
     void readRegisters(uint8_t bank, uint8_t reg, uint8_t *buf, size_t len);
 
     bool init_ICM20948();
+
+
+    bool enableMagnetometer();
+
+    static constexpr uint8_t USER_CTRL           = 0x03;
+    static constexpr uint8_t I2C_MST_EN          = 0x20;
+    static constexpr uint8_t I2C_MST_CTRL        = 0x01;
+    static constexpr uint8_t I2C_SLV0_ADDR       = 0x03;
+    static constexpr uint8_t I2C_SLV0_REG        = 0x04;
+    static constexpr uint8_t I2C_SLV0_CTRL       = 0x05;
+    static constexpr uint8_t I2C_SLV0_DO         = 0x06;
+    static constexpr uint8_t EXT_SLV_SENS_DATA_00= 0x3B; // or 0x3B (check datasheet)
 };
 
 #endif

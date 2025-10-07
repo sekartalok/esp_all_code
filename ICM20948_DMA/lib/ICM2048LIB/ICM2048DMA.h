@@ -228,7 +228,7 @@ enum class REGISTER_BITS : uint8_t {
     AK09916_READ                = 0x80
 } ;
 
-enum class OTHERS{
+typedef enum OTHERS {
         // AK09916 WHO_AM_I Values (16-bit)
     AK09916_WHO_AM_I_1      = 0x4809,  // Company ID (0x48) + Device ID (0x09)
     AK09916_WHO_AM_I_2      = 0x0948,  // Alternate byte order
@@ -238,12 +238,12 @@ enum class OTHERS{
     
     // I2C Master Control Bit
     ICM20948_I2C_MST_RST      = 0x02
-};
+}Others;
 
 class ICM20948_DMA {
 protected:
     // DMA SPI interface
-    ESP32DMASPI::Master master;
+    ESP32DMASPI::Master * master;
     uint8_t *dma_tx_buf{nullptr};
     uint8_t *dma_rx_buf{nullptr};
 
@@ -270,6 +270,16 @@ protected:
     void readAllData(uint8_t *data);
     void reset_ICM20948();
     void spiTransfer(size_t len);
+    void enableI2CMaster();
+    void resetI2CMaster();
+    void reset_AK09916();
+    
+
+    // low-level I2C AK09916 DMA oprations
+    uint8_t AK09916_readRegister8(uint8_t reg);
+    void AK09916_writeRegister8(uint8_t reg , uint8_t val);
+    // enable mag read 
+    void AK09916_enableMagRead(uint8_t reg ,uint8_t byte);
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
@@ -285,6 +295,9 @@ public:
     void setGyrRange(ICM20948_gyroRange range);
     void setAccDLPF(ICM20948_dlpf dlpf);
     void sleep(bool sleep);
+    bool magnetoInit();
+    void setMagMode(AK09916_opMode mode);
+    bool init_AK09916();
 
     // Data acquisition
     void readSensor();
@@ -294,6 +307,11 @@ public:
 
     //check
     uint8_t whoAmI();
+    uint16_t whoAmI_AK09916();
+    //USE ONLY OUTSIDE LOOP, HEAP ALLOCATION AND DEALOCATION INSIDE
+    bool recycle();
+
+
 };
 #endif
 

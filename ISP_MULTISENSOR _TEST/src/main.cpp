@@ -16,8 +16,13 @@ Serial.begin(9600);
 while(!Serial);
 SPI.begin(SCL, ADO, SDA, NCS);
 
-if(!master.init()){Serial.println("NOT WORKING");}
+if(!master.init()){Serial.println("NOT WORKING");while(1);}
 else{Serial.println("WORKING");}
+if(master.init_AK09916()){
+    Serial.println("magnet working");
+}else{
+    Serial.println("notworking");
+}
 
 }
 
