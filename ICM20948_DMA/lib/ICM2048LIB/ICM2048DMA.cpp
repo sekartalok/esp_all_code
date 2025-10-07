@@ -5,8 +5,8 @@ ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(
     //digitalWrite(csPin, HIGH);
     master = new ESP32DMASPI::Master();
     master->begin(HSPI, sclPin, adoPin, sdaPin, csPin);
-    dma_tx_buf = master->allocDMABuffer(32);
-    dma_rx_buf = master->allocDMABuffer(32);
+    dma_tx_buf = master->allocDMABuffer(64);
+    dma_rx_buf = master->allocDMABuffer(64);
 
 }
 
@@ -33,7 +33,7 @@ bool ICM20948_DMA::init() {
 
     master->setDataMode(SPI_MODE0);
     master->setFrequency(1000000);  
-    master->setMaxTransferSize(32);
+    master->setMaxTransferSize(64);
     master->setQueueSize(1);
 
     delay(200);
