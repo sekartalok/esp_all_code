@@ -311,6 +311,9 @@ public:
     //USE ONLY OUTSIDE LOOP, HEAP ALLOCATION AND DEALOCATION INSIDE
     bool recycle();
 
+    void i2cWrite8(uint8_t bank, uint8_t reg, uint8_t val);
+    uint8_t i2cRead8(uint8_t bank, uint8_t reg);
+
 
 };
 #endif

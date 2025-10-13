@@ -27,5 +27,7 @@ if(master.init_AK09916()){
 }
 
 void loop() {
+
+    delay(1000);
 }
 

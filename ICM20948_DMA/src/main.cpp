@@ -12,6 +12,7 @@ void setup() {
   Serial.begin(115200);
   if(imu.init()){
     Serial.println("WORKING");
+    Serial.println(imu.init_AK09916());
   }else{
     Serial.println("not working");
   }
@@ -19,6 +20,7 @@ void setup() {
 }
 
 void loop() {
+    Serial.println(imu.init_AK09916());
 
 }
 
