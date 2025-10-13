@@ -241,7 +241,7 @@ typedef enum OTHERS {
 }Others;
 
 class ICM20948_DMA {
-protected:
+private:
     // DMA SPI interface
     ESP32DMASPI::Master * master;
     uint8_t *dma_tx_buf{nullptr};
