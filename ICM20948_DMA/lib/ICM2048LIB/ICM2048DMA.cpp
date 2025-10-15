@@ -40,7 +40,7 @@ ICM20948_DMA::~ICM20948_DMA() {
     }
 }
 
-// Main init 
+/* ========================= ICM20948 GENERAL SETUP ========================= */
 void ICM20948_DMA::dmaEnable(){
 
     delay(50);
@@ -112,6 +112,7 @@ bool ICM20948_DMA::init() {
     return true;
 }
 /* recycle */
+/* INOP */
 /*
 bool ICM20948_DMA::recycle(){
     if (master) {
@@ -136,7 +137,8 @@ bool ICM20948_DMA::recycle(){
 }*/
 
 
-/* READ AND WRITE MASTER */
+
+/* ========================= READ AND WRRITE MASTER FOR 8BIT REG ========================= */
 
 void ICM20948_DMA::writeRegister8(uint8_t bank, uint8_t reg, uint8_t val) {
     switchBank(bank);
@@ -183,7 +185,8 @@ uint8_t ICM20948_DMA::readRegister8(uint8_t bank, uint8_t reg) {
     return Return;
 
 }
-/* sensor read */
+
+/* ========================= SENSOR DATA READ ========================= */
 
 void ICM20948_DMA::readSensor(){
     switchBank(0);
@@ -281,7 +284,8 @@ void ICM20948_DMA::spiTransfer(size_t len){
 }
 
 
-/* SENSOR SET RANGE */
+/* ========================= ICM20948 SENSOR SET RANGE ========================= */
+
 
 void ICM20948_DMA::setAccRange(ICM20948_accRange accRange){
 
@@ -308,7 +312,7 @@ void ICM20948_DMA::setGyrRange(ICM20948_gyroRange  gyrRange){
 
 
 
-/* SENSOR PWR */
+/* ========================= ICM20948 SENSOR PWR OPTIONS ========================= */
 
 void ICM20948_DMA::sleep(bool sleep) {
     uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_PWR_MGMT_1));
@@ -348,7 +352,8 @@ void ICM20948_DMA::enableGyr(bool enGyr){
 
 
 
-/* SUPPORT */
+
+/* ========================= ICM20948 SUPPORT ========================= */
 
 
 void ICM20948_DMA::reset_ICM20948() {
@@ -384,7 +389,7 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
     }
 }
 
-/* magneto meter */
+
 
 
 /* ========================= AK09916 MAGNETOMETER ========================= */
