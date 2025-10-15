@@ -272,9 +272,9 @@ void ICM20948_DMA::getAccRawValues(xyzFloat *accRawVal){
  
 void ICM20948_DMA::getGyrRawValues(xyzFloat *gyrRawVal){
 
-    gyrRawVal->x = static_cast<int16_t>(((buffer[0]) << 8) | buffer[1]);
-    gyrRawVal->y = static_cast<int16_t>(((buffer[2]) << 8) | buffer[3]);
-    gyrRawVal->z = static_cast<int16_t>(((buffer[4]) << 8) | buffer[5]);
+    gyrRawVal->x = static_cast<int16_t>(((buffer[6]) << 8) | buffer[7]);
+    gyrRawVal->y = static_cast<int16_t>(((buffer[8]) << 8) | buffer[9]);
+    gyrRawVal->z = static_cast<int16_t>(((buffer[10]) << 8) | buffer[11]);
 }
 
 float ICM20948_DMA::getTemperature(){
@@ -292,7 +292,7 @@ void ICM20948_DMA::getMagValues(xyzFloat *mag) {
 }
 
 
-/* utils */
+/* ========================= ICM20948 UTILS ========================= */
 uint8_t ICM20948_DMA::whoAmI() {
     return readRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_WHO_AM_I));
 }

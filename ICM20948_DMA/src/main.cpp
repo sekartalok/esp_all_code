@@ -28,17 +28,34 @@ delay(10);
 
 void loop() {
   Serial.println("READ SENSOR");
-  xyzFloat magValue;
+
+  xyzFloat mag;
+  xyzFloat acc;
+  xyzFloat gyr;
   imu.readSensor();
-  imu.getMagValues(&magValue);
-  Serial.println("Magnetometer Data in µTesla: ");
-  Serial.print(magValue.x);
+  imu.getAccRawValues(&acc);
+  imu.getGyrRawValues(&gyr);
+  imu.getMagValues(&mag);
+  
+  Serial.println("MAGNETO");
+  Serial.print(mag.x);
   Serial.print("   ");
-  Serial.print(magValue.y);
+  Serial.print(mag.y);
   Serial.print("   ");
-  Serial.println(magValue.z);
+  Serial.println(mag.z);
+  Serial.println("ACC");
+  Serial.print(acc.x);
+  Serial.print("   ");
+  Serial.print(acc.y);
+  Serial.print("   ");
+  Serial.println(acc.z);
+  Serial.println("GYR");
+  Serial.print(gyr.x);
+  Serial.print("   ");
+  Serial.print(gyr.y);
+  Serial.print("   ");
+  Serial.println(gyr.z);
   delay(1000);
-    
 
 
 }
