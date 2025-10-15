@@ -242,8 +242,11 @@ typedef enum OTHERS {
 
 class ICM20948_DMA {
 private:
+    bool DMACON{false};
     // DMA SPI interface
-    ESP32DMASPI::Master * master;
+    ESP32DMASPI::Master * DMASPI;
+    SPIClass * SPI;
+    SPISettings spi_setting;
     uint8_t *dma_tx_buf{nullptr};
     uint8_t *dma_rx_buf{nullptr};
 
@@ -280,6 +283,8 @@ private:
     void AK09916_writeRegister8(uint8_t reg , uint8_t val);
     // enable mag read 
     void AK09916_enableMagRead(uint8_t reg ,uint8_t byte);
+    void setupMagnetometerSLV0();
+    void setMagMode(uint8_t mode);
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
@@ -288,6 +293,7 @@ public:
 
     // Initialization and configuration
     bool init();
+    void dmaEnable();
     void setSPIClockSpeed(unsigned long clock);
     void enableAcc(bool enAcc);
     void setAccRange(ICM20948_accRange accRange);
@@ -304,6 +310,7 @@ public:
     void getAccRawValues(xyzFloat *accRawVal);
     void getGyrRawValues(xyzFloat *gyrRawVal);
     float getTemperature();
+    void getMagValues(xyzFloat *mag);
 
     //check
     uint8_t whoAmI();
@@ -311,8 +318,7 @@ public:
     //USE ONLY OUTSIDE LOOP, HEAP ALLOCATION AND DEALOCATION INSIDE
     bool recycle();
 
-    void i2cWrite8(uint8_t bank, uint8_t reg, uint8_t val);
-    uint8_t i2cRead8(uint8_t bank, uint8_t reg);
+ 
 
 
 };

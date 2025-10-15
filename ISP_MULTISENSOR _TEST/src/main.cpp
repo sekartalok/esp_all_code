@@ -16,6 +16,9 @@ Serial.begin(9600);
 while(!Serial);
 SPI.begin(SCL, ADO, SDA, NCS);
 
+
+delay(5000);
+
 if(!master.init()){Serial.println("NOT WORKING");while(1);}
 else{Serial.println("WORKING");}
 if(master.init_AK09916()){

@@ -1,21 +1,34 @@
 #include "ICM2048DMA.h"
 
 ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(ado), sdaPin(sda), csPin(cs){
-    //pinMode(csPin, OUTPUT);
-    //digitalWrite(csPin, HIGH);
+    pinMode(csPin, OUTPUT);
+    digitalWrite(csPin, HIGH);
+
+    SPI = new SPIClass(1);
+
+
+
+    /*
     master = new ESP32DMASPI::Master();
     master->begin(HSPI, sclPin, adoPin, sdaPin, csPin);
     dma_tx_buf = master->allocDMABuffer(400);
     dma_rx_buf = master->allocDMABuffer(400);
-
+   */
 }
 
 // Destructor
 ICM20948_DMA::~ICM20948_DMA() {
-    if (master) {
-        master->end();   
-        delete master;   
-        master = nullptr;
+
+    if(SPI){
+        SPI->end();
+        delete SPI;
+        SPI = nullptr;
+
+    }
+    if (DMASPI) {
+        DMASPI->end();   
+        delete DMASPI;   
+        DMASPI = nullptr;
     }
     if (dma_tx_buf) {
         heap_caps_free(dma_tx_buf);
@@ -26,15 +39,44 @@ ICM20948_DMA::~ICM20948_DMA() {
         dma_rx_buf = nullptr;
     }
 }
+
 // Main init 
+void ICM20948_DMA::dmaEnable(){
+
+    delay(50);
+    SPI->end();
+    delete SPI;
+    SPI =nullptr;
+    delay(10);
+
+
+    DMACON = true;
+
+    digitalWrite(csPin, HIGH);
+    DMASPI = new ESP32DMASPI::Master();
+    DMASPI->begin(HSPI, sclPin, adoPin, sdaPin, csPin);
+    dma_tx_buf = DMASPI->allocDMABuffer(400);
+    dma_rx_buf = DMASPI->allocDMABuffer(400);
+
+    delay(10);
+
+    DMASPI->setDataMode(SPI_MODE0);
+    DMASPI->setFrequency(1000000);  
+    DMASPI->setMaxTransferSize(400);
+    DMASPI->setQueueSize(1);
+
+    delay(100);
+
+
+
+
+
+}
 
 bool ICM20948_DMA::init() {
 
-
-    master->setDataMode(SPI_MODE0);
-    master->setFrequency(1000000);  
-    master->setMaxTransferSize(104);
-    master->setQueueSize(1);
+    SPI->begin(sclPin, adoPin, sdaPin, csPin);
+    spi_setting = SPISettings(1000000, MSBFIRST, SPI_MODE0);
 
     delay(200);
 
@@ -65,10 +107,12 @@ bool ICM20948_DMA::init() {
     enableGyr(true); 
     writeRegister8(2, static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
     reset_ICM20948();
+    delay(50);
 
     return true;
 }
 /* recycle */
+/*
 bool ICM20948_DMA::recycle(){
     if (master) {
         master->end();  
@@ -89,50 +133,88 @@ bool ICM20948_DMA::recycle(){
     dma_rx_buf = master->allocDMABuffer(32);
     return init();
 
-}
+}*/
 
 
 /* READ AND WRITE MASTER */
 
 void ICM20948_DMA::writeRegister8(uint8_t bank, uint8_t reg, uint8_t val) {
     switchBank(bank);
-
-    dma_tx_buf[0] = reg & ICM20948_WRITE_MASKING_BIT ;
-    dma_tx_buf[1] = val;
+    if(DMACON){
+        dma_tx_buf[0] = reg & ICM20948_WRITE_MASKING_BIT ;
+        dma_tx_buf[1] = val;
 
     spiTransfer(2);
+    }else{
+        digitalWrite(csPin, LOW);
+        SPI->beginTransaction(spi_setting);
+    
+        SPI->transfer(reg & ICM20948_WRITE_MASKING_BIT); // write mask
+        SPI->transfer(val);
+
+        SPI->endTransaction();
+        digitalWrite(csPin, HIGH);
+
+    }
     delayMicroseconds(5);
+    
 }
 
 uint8_t ICM20948_DMA::readRegister8(uint8_t bank, uint8_t reg) {
     switchBank(bank);
-
+    uint8_t Return;
+    if(DMACON){
     dma_tx_buf[0]= reg | ICM20948_READ_MASKING_BIT;
     dma_tx_buf[1] = 0x00;
     spiTransfer(2);
+    Return = dma_rx_buf[1];
+    }else{
+        digitalWrite(csPin, LOW);
+        SPI->beginTransaction(spi_setting);
 
+        SPI->transfer(reg | ICM20948_READ_MASKING_BIT); // read mask
+        Return = SPI->transfer(0x00);
+
+        SPI->endTransaction();
+        digitalWrite(csPin, HIGH);
+    }
 
     delayMicroseconds(5);
-    return dma_rx_buf[1];
+    return Return;
 
 }
 /* sensor read */
 
 void ICM20948_DMA::readSensor(){
+    switchBank(0);
     uint8_t Reg = static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_ACCEL_OUT)| ICM20948_READ_MASKING_BIT;
-    dma_tx_buf[0] = Reg;
-    //zero the tx
-    int i = 1;
-    while(i<=20){
-        dma_tx_buf[i] = 0x00;
-        i++;
-    }
+    if(DMACON){
+        dma_tx_buf[0] = Reg;
+        //zero the tx
+        int i = 1;
+        while(i<=20){
+            dma_tx_buf[i] = 0x00;
+            i++;
+        }
 
-    spiTransfer(21);
-    i = 0;
-    while(i<20){
-        buffer[i] = dma_rx_buf[i+1];
-        i++;
+        spiTransfer(21);
+        i = 0;
+        while(i<20){
+            buffer[i] = dma_rx_buf[i+1];
+            i++;
+        }
+    }else{
+        digitalWrite(csPin,LOW);
+        SPI->beginTransaction(spi_setting);
+        SPI->transfer(Reg);
+        int i = 0;
+        while(i<20){
+            buffer[i] = SPI->transfer(0x00);
+            i++;
+        }
+        SPI->endTransaction();
+        digitalWrite(csPin,HIGH);
+        
     }
 
 
@@ -157,6 +239,16 @@ float ICM20948_DMA::getTemperature(){
     int16_t rawTemp = static_cast<int16_t>(((buffer[12]) << 8) | buffer[13]);
     return (rawTemp*1.0 - 0.0)/333.87 + 21.0f;
 }
+
+void ICM20948_DMA::getMagValues(xyzFloat *mag) {
+    mag->x = static_cast<int16_t>((buffer[15]) << 8) | buffer[14];
+    mag->y = static_cast<int16_t>((buffer[17]) << 8) | buffer[16];
+    mag->z = static_cast<int16_t>((buffer[19]) << 8) | buffer[18];
+
+
+
+}
+
 
 /* utils */
 uint8_t ICM20948_DMA::whoAmI() {
@@ -184,8 +276,8 @@ void ICM20948_DMA::spiTransfer(size_t len){
     size_t aligned_len = (len + 3) & ~0x03; // 4byte is missing SPI SLAVE
 
 
-    master->queue(dma_tx_buf, dma_rx_buf, aligned_len);
-    master->trigger();
+    DMASPI->queue(dma_tx_buf, dma_rx_buf, aligned_len);
+    DMASPI->trigger();
 }
 
 
@@ -266,12 +358,27 @@ void ICM20948_DMA::reset_ICM20948() {
 }
 void ICM20948_DMA::switchBank(uint8_t newBank) {
     if (newBank != currentBank) {
-        currentBank = newBank;
+        if(DMACON){
+            currentBank = newBank;
 
-        dma_tx_buf[0] = static_cast<uint8_t>(ICM20948_All_Bank::ICM20948_REG_BANK_SEL) & ICM20948_WRITE_MASKING_BIT;
-        dma_tx_buf[1] = ( newBank & ICM20948_BANK_MASKING_BIT ) << 4;
+            dma_tx_buf[0] = static_cast<uint8_t>(ICM20948_All_Bank::ICM20948_REG_BANK_SEL) & ICM20948_WRITE_MASKING_BIT;
+            dma_tx_buf[1] = ( newBank & ICM20948_BANK_MASKING_BIT ) << 4;
 
-        spiTransfer(2);
+            spiTransfer(2);
+        }else{
+            currentBank = newBank;
+            digitalWrite(csPin, LOW);
+            SPI->beginTransaction(spi_setting);
+        
+
+            SPI->transfer(static_cast<uint8_t>(ICM20948_All_Bank::ICM20948_REG_BANK_SEL) & ICM20948_WRITE_MASKING_BIT);
+            SPI->transfer((newBank & ICM20948_BANK_MASKING_BIT ) << 4);
+
+        
+            SPI->endTransaction();
+            digitalWrite(csPin, HIGH);
+
+        }
 
         delayMicroseconds(10);
     }
@@ -280,177 +387,133 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
 /* magneto meter */
 
 
-bool ICM20948_DMA::init_AK09916(){
-    bool succes = false;
-   // reset_ICM20948();
+/* ========================= AK09916 MAGNETOMETER ========================= */
+
+bool ICM20948_DMA::init_AK09916() {
+    bool success = false;
+
+
+    reset_ICM20948();
+    delay(100);
+
     enableI2CMaster();
+    delay(10);
+
     reset_AK09916();
+    delay(100);
+
     sleep(false);
     writeRegister8(2, static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
-    uint8_t trying = 0;
-    while (!succes && trying < 1){
+
+    uint8_t tries = 0;
+    while (!success && tries < 5) {
         delay(10);
         enableI2CMaster();
         delay(10);
 
         uint16_t who = whoAmI_AK09916();
-        if(! ((who == AK09916_WHO_AM_I_1) || (who == AK09916_WHO_AM_I_2))){
-            resetI2CMaster();
-            succes = false;
-            trying++;
-            
+ 
 
-        }else{
-            succes = true;
+        if ((who == AK09916_WHO_AM_I_1) || (who == AK09916_WHO_AM_I_2)) {
+            success = true;
             break;
+        } else {
+
+            resetI2CMaster();
+            tries++;
         }
     }
-    if(succes){
-        //default mode
+
+    if (success) {
+
         setMagMode(AK09916_CONT_MODE_100HZ);
-
-    }
-        
-    return succes;
+    } 
 
 
+    return success;
 }
-void ICM20948_DMA::reset_AK09916(){
-    AK09916_writeRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_CNTL_3 ),0x01);
+
+void ICM20948_DMA::reset_AK09916() {
+
+    AK09916_writeRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_CNTL_3), 0x01);
     delay(100);
-    
 }
 
-uint16_t ICM20948_DMA::whoAmI_AK09916(){
+uint16_t ICM20948_DMA::whoAmI_AK09916() {
+
     uint8_t ADDH_byte = AK09916_readRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_WIA_1));
     uint8_t ADDL_byte = AK09916_readRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_WIA_2));
-    return (ADDH_byte<<8) | ADDL_byte;
-
+    return (ADDH_byte << 8) | ADDL_byte;
 }
-void ICM20948_DMA::setMagMode(AK09916_opMode mode){
-    AK09916_writeRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_CNTL_2 ),mode);
-    if(mode != AK09916_PWR_DOWN){
-        AK09916_enableMagRead(static_cast<uint8_t>(AK09916_Registers::AK09916_HXL ),0x08);
 
+void ICM20948_DMA::setMagMode(AK09916_opMode mode) {
+
+    AK09916_writeRegister8(static_cast<uint8_t>(AK09916_Registers::AK09916_CNTL_2), mode);
+    delay(10);
+
+    if (mode != AK09916_PWR_DOWN) {
+        Serial.println("Enabling continuous mag read via SLV0...");
+        switchBank(3);
+
+        // Setup SLV0 (Wolfgang Ewald style)
+        writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_ADDR),
+                       static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | 0x80); // Read mode
+        writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_REG),
+                       static_cast<uint8_t>(AK09916_Registers::AK09916_HXL)); // Start from HXL
+        writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_CTRL), 0x88); // Enable + 8 bytes
+
+        // Debugging
+        uint8_t addr = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_ADDR));
+        uint8_t reg  = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_REG));
+        uint8_t ctrl = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_CTRL));
+   
     }
-
 }
 
-/* I2C MASTER */
+/* ========================= I2C MASTER CONTROL ========================= */
 
-void ICM20948_DMA::enableI2CMaster(){
-    i2cWrite8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),
-    static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_MST_EN));
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_MST_CTRL),0x07);//set clock I2C
+void ICM20948_DMA::enableI2CMaster() {
+    switchBank(0);
+    writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),
+                   static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_MST_EN));
+    switchBank(3);
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_MST_CTRL), 0x07); // 400 kHz I2C clock
 }
 
-void ICM20948_DMA::resetI2CMaster(){
-    uint8_t temp = i2cRead8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL));
-    temp |= ICM20948_I2C_MST_RST ;
-    i2cWrite8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),temp);
-    
+void ICM20948_DMA::resetI2CMaster() {
+    uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL));
+    temp |= ICM20948_I2C_MST_RST;
+    writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL), temp);
+    delay(10);
 }
 
-/* I2C READ WRITE FOR AK09916 */
-uint8_t ICM20948_DMA::AK09916_readRegister8(uint8_t reg){
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
-    static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | static_cast<uint8_t>(REGISTER_BITS::AK09916_READ));
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG ),reg);//tell register read
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL),static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN));
+/* ========================= AK09916 REGISTER ACCESS ========================= */
 
-    //waiting register to clear and avoid run away code
-// After writing I2C_SLV4_CTRL to enable the transaction
-delay(10); // Give some time for transaction before polling status
+uint8_t ICM20948_DMA::AK09916_readRegister8(uint8_t reg) {
+    switchBank(3);
 
-unsigned long startMillis = millis();
-while (true) {
-    uint8_t status = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL));
-    if ((status & 0x80) == 0) break;
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
+              static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | 0x80); // Read mode
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG), reg);
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL), 0x80);
 
-    if ((millis() - startMillis) > 100) {
-        // Timeout reached, reset I2C master here
-        resetI2CMaster();
-        break;
-    }
-    
-    delay(1);
-}
-
-    return i2cRead8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DI));
-
-}
-
-void ICM20948_DMA::AK09916_writeRegister8(uint8_t reg , uint8_t val){
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS));
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DO),val);
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG ),reg); //tell register write 
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL),static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN));
-
-    //waiting register to clear and avoid run away code
-  // After writing I2C_SLV4_CTRL to enable the transaction
-delay(10); // Give some time for transaction before polling status
-
-unsigned long startMillis = millis();
-while (true) {
-    uint8_t status = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL));
-    if ((status & 0x80) == 0) break;
-
-    if ((millis() - startMillis) > 100) {
-        // Timeout reached, reset I2C master here
-        resetI2CMaster();
-        break;
-    }
-    
-    delay(1);
-}
-
-
-}
-
-/*mag data read enable*/
-void ICM20948_DMA::AK09916_enableMagRead(uint8_t reg ,uint8_t byte){
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
-    static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | static_cast<uint8_t>(REGISTER_BITS::AK09916_READ));
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG ),reg);
-    i2cWrite8(3,static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL),static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN) | byte);
-    delay(12);
-
-}
-
-
-void ICM20948_DMA::i2cWrite8(uint8_t bank, uint8_t reg, uint8_t val) {
-    // Sniffer: Log all I2C master register writes
-    if (bank == 3 &&
-        (reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR) ||
-         reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG) ||
-         reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DO) ||
-         reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL))) {
-        Serial.printf("[I2C Sniffer Write] Reg 0x%02X : 0x%02X\n", reg, val);
-    }
-
-    switchBank(bank);
-    dma_tx_buf[0] = reg & ICM20948_WRITE_MASKING_BIT;
-    dma_tx_buf[1] = val;
-    spiTransfer(2);
-    delayMicroseconds(5);
-}
-
-uint8_t ICM20948_DMA::i2cRead8(uint8_t bank, uint8_t reg) {
-    switchBank(bank);
-    dma_tx_buf[0] = reg | ICM20948_READ_MASKING_BIT;
-    dma_tx_buf[1] = 0x00;
-    spiTransfer(2);
-    delayMicroseconds(5);
-    uint8_t val = dma_rx_buf[1];
-
-    // Sniffer: Log all I2C master register reads
-    if (bank == 3 &&
-        (reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR) ||
-         reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG) ||
-         reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DI) ||
-         reg == static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL))) {
-        Serial.printf("[I2C Sniffer Read] Reg 0x%02X : 0x%02X\n", reg, val);
-    }
-
+    delay(10);
+    uint8_t val = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DI));
     return val;
 }
+
+void ICM20948_DMA::AK09916_writeRegister8(uint8_t reg, uint8_t val) {
+    switchBank(3);
+
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
+              static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS)); // Write
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DO), val);
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG), reg);
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL), 0x80);
+
+    delay(10);
+}
+
+
+
+
