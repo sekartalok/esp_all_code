@@ -5,15 +5,6 @@ ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(
     digitalWrite(csPin, HIGH);
 
     SPI = new SPIClass(1);
-
-
-
-    /*
-    master = new ESP32DMASPI::Master();
-    master->begin(HSPI, sclPin, adoPin, sdaPin, csPin);
-    dma_tx_buf = master->allocDMABuffer(400);
-    dma_rx_buf = master->allocDMABuffer(400);
-   */
 }
 
 // Destructor
@@ -111,7 +102,55 @@ bool ICM20948_DMA::init() {
 
     return true;
 }
+void ICM20948_DMA::end(){
+    spi_setting = SPISettings();
+    if(SPI){
+        SPI->end();
+        delete SPI;
+        SPI = nullptr;
+
+    }
+    if (DMASPI) {
+        DMASPI->end();   
+        delete DMASPI;   
+        DMASPI = nullptr;
+    }
+    if (dma_tx_buf) {
+        heap_caps_free(dma_tx_buf);
+        dma_tx_buf = nullptr;
+    }
+    if (dma_rx_buf) {
+        heap_caps_free(dma_rx_buf);
+        dma_rx_buf = nullptr;
+    }
+
+}
+
+bool ICM20948_DMA::allInit(){
+    if(!init()){
+        return false;
+    }
+    if(!init_AK09916()){
+        end();
+        return false;
+    }
+    delay(50);
+    setAccRange(ICM20948_ACC_RANGE_2G);
+    setAccDLPF(ICM20948_DLPF_6);
+    delay(10);
+    setGyrRange(ICM20948_GYRO_RANGE_250);
+    setGyrDLPF(ICM20948_DLPF_6);
+    delay(10);
+    setMagMode(AK09916_CONT_MODE_20HZ);
+    delay(50);
+    
+
+    dmaEnable();
+    delay(50);
+    return true;
+}
 /* recycle */
+
 /* INOP */
 /*
 bool ICM20948_DMA::recycle(){
@@ -274,6 +313,22 @@ void ICM20948_DMA::setAccDLPF(ICM20948_dlpf dlpf){
     writeRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::ACCEL_CONFIG),temp);
 
 }
+
+void ICM20948_DMA::setGyrDLPF(ICM20948_dlpf dlpf){
+    uint8_t temp = readRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::GYRO_CONFIG_1));
+    if(dlpf!=ICM20948_DLPF_OFF){
+        temp |= 0x01;
+        temp &= 0xC7;
+        temp |= (dlpf<<3);
+    }else{
+        temp &= 0xFE;
+    }
+ 
+    writeRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::GYRO_CONFIG_1),temp);
+
+
+}
+
 
 void ICM20948_DMA::spiTransfer(size_t len){
     size_t aligned_len = (len + 3) & ~0x03; // 4byte is missing SPI SLAVE
@@ -457,20 +512,13 @@ void ICM20948_DMA::setMagMode(AK09916_opMode mode) {
     delay(10);
 
     if (mode != AK09916_PWR_DOWN) {
-        Serial.println("Enabling continuous mag read via SLV0...");
         switchBank(3);
 
-        // Setup SLV0 (Wolfgang Ewald style)
         writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_ADDR),
                        static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | 0x80); // Read mode
         writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_REG),
                        static_cast<uint8_t>(AK09916_Registers::AK09916_HXL)); // Start from HXL
         writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_CTRL), 0x88); // Enable + 8 bytes
-
-        // Debugging
-        uint8_t addr = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_ADDR));
-        uint8_t reg  = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_REG));
-        uint8_t ctrl = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV0_CTRL));
    
     }
 }
@@ -498,13 +546,21 @@ uint8_t ICM20948_DMA::AK09916_readRegister8(uint8_t reg) {
     switchBank(3);
 
     writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_ADDR),
-              static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | 0x80); // Read mode
+              static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS) | static_cast<uint8_t>(REGISTER_BITS::AK09916_READ)); // Read mode
     writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG), reg);
-    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL), 0x80);
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL), static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN));
 
     delay(10);
-    uint8_t val = readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DI));
-    return val;
+    uint32_t startmilis = millis();
+    //avoid code hang
+    while(readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL) & static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN) )){
+        if(millis() - startmilis < 100){
+            break;
+        }
+        
+    }
+    return readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DI));
+
 }
 
 void ICM20948_DMA::AK09916_writeRegister8(uint8_t reg, uint8_t val) {
@@ -514,9 +570,17 @@ void ICM20948_DMA::AK09916_writeRegister8(uint8_t reg, uint8_t val) {
               static_cast<uint8_t>(ICM20948_CONSTANTS::AK09916_ADDRESS)); // Write
     writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_DO), val);
     writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_REG), reg);
-    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL), 0x80);
+    writeRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL), static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN));
 
     delay(10);
+    //avoid code hang
+    uint32_t startmilis = millis();
+    while(readRegister8(3, static_cast<uint8_t>(ICM20948_Bank3_Registers::I2C_SLV4_CTRL) & static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_SLVX_EN) )){
+        if(millis() - startmilis < 100){
+            break;
+        }
+        
+    }
 }
 
 

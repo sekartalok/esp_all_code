@@ -290,7 +290,10 @@ public:
     // Constructor: specify all SPI pins and optional I2C pins
    ICM20948_DMA(int scl,int ado,int sda,int cs);
    ~ICM20948_DMA();
-
+    // all in once configurations
+    bool allInit();
+    // end
+    void end();
     // Initialization and configuration
     bool init();
     void dmaEnable();
@@ -300,6 +303,7 @@ public:
     void enableGyr(bool enGyr);
     void setGyrRange(ICM20948_gyroRange range);
     void setAccDLPF(ICM20948_dlpf dlpf);
+    void setGyrDLPF(ICM20948_dlpf dlpf);
     void sleep(bool sleep);
     bool magnetoInit();
     void setMagMode(AK09916_opMode mode);

@@ -10,7 +10,7 @@ ICM20948_DMA imu(SCL, ADO, SDA, NCS);
 
 void setup() {
   Serial.begin(115200);
-  if(imu.init()){
+  if(imu.allInit()){
     Serial.println("WORKING");
     
     
@@ -19,12 +19,9 @@ void setup() {
     Serial.println("not working");
     while(true);
   }
-  if(imu.init_AK09916()){
-    Serial.println("AK WORKING");
-  }else{
-    Serial.println("AK NOT WORKING");
-  }
-imu.dmaEnable();
+
+
+  
 delay(10);
 
 }
@@ -40,9 +37,8 @@ void loop() {
   Serial.print(magValue.y);
   Serial.print("   ");
   Serial.println(magValue.z);
-    
   delay(1000);
+    
+
 
 }
-
-
