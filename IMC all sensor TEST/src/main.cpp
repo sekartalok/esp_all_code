@@ -66,8 +66,8 @@ void gyro(){
   xyzFloat gyrRaw; 
   xyzFloat gyr;
   my_sensor.readSensor();
-  my_sensor.getCorrectedGyrRawValues(&gyrRaw);
-  my_sensor.getGyrValues(&gyr);
+  my_sensor.getMagValues(&gyrRaw);
+
     
   Serial.println("Raw gyroscope values (x,y,z):");
   Serial.print(gyrRaw.x);

@@ -97,13 +97,13 @@ bool ICM20948_DMA::init() {
     enableAcc(true);
     enableGyr(true); 
     writeRegister8(2, static_cast<uint8_t>(ICM20948_Bank_2_Registers::ODR_ALIGN_EN), 1);
-    reset_ICM20948();
+    //reset_ICM20948();
     delay(50);
 
-    if(AK09916_EN){
-        disableI2CMaster();
-        delay(50);
-    }  
+   // if(!AK09916_EN){
+   //     disableI2CMaster();
+   //     delay(50);
+   // }  
 
     return true;
 }
@@ -111,12 +111,18 @@ void ICM20948_DMA::end(){
 
     spi_setting = SPISettings();
     if(SPI){
+        delay(50);
         SPI->end();
-    }else{
-        pinMode(csPin, OUTPUT);
-        digitalWrite(csPin, HIGH);
-        SPI = new SPIClass(1);   
+        delete SPI;
+        SPI =nullptr;
+        delay(10);
+
+        
     }
+    pinMode(csPin, OUTPUT);
+    digitalWrite(csPin, HIGH);
+    SPI = new SPIClass(1);   
+   
 
     delay(50);
 
@@ -532,25 +538,19 @@ void ICM20948_DMA::enableDataRedyInterrupt(){
     writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_ENABLE_1), 0x01);
 }
 
-void ICM20948_DMA::disableOtherInterrupt(){
-
-}
-
 uint8_t ICM20948_DMA::readAndClearInterrupts(){
     uint8_t intSource = 0;
     uint8_t regVal = 0;
-    uint8_t master = 0;
+ 
 
 
     regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS));
-    master += regVal;
     if (regVal & 0x80) { 
         intSource |= 0x01;
     }
 
 
     regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS));
-    master += regVal;
     if (regVal & 0x08) {   
         intSource |=0x02;
     }
@@ -560,7 +560,6 @@ uint8_t ICM20948_DMA::readAndClearInterrupts(){
 
    
     regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1));
-    master += regVal;
     if (regVal & 0x01) { 
         intSource |= 0x08;
     }
@@ -568,7 +567,7 @@ uint8_t ICM20948_DMA::readAndClearInterrupts(){
   
 
 
-    return master;
+    return regVal;
 }
 
 
