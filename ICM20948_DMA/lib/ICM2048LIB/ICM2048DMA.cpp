@@ -100,6 +100,11 @@ bool ICM20948_DMA::init() {
     reset_ICM20948();
     delay(50);
 
+    if(AK09916_EN){
+        disableI2CMaster();
+        delay(50);
+    }  
+
     return true;
 }
 void ICM20948_DMA::end(){
@@ -574,7 +579,13 @@ void ICM20948_DMA::setMagMode(AK09916_opMode mode) {
 }
 
 /* ========================= I2C MASTER CONTROL ========================= */
+void ICM20948_DMA::disableI2CMaster(){
+    switchBank(0);
+    uint8_t temp =  readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL));
+    temp &= ~static_cast<uint8_t>(REGISTER_BITS::ICM20948_I2C_MST_EN);
+    writeRegister8(0,static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),temp);
 
+}
 void ICM20948_DMA::enableI2CMaster() {
     switchBank(0);
     writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_USER_CTRL),

@@ -274,6 +274,7 @@ private:
     void reset_ICM20948();
     void spiTransfer(size_t len);
     void enableI2CMaster();
+    void disableI2CMaster();
     void resetI2CMaster();
     void reset_AK09916();
     
@@ -285,6 +286,7 @@ private:
     void AK09916_enableMagRead(uint8_t reg ,uint8_t byte);
     void setupMagnetometerSLV0();
     void setMagMode(uint8_t mode);
+
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
@@ -312,6 +314,7 @@ public:
     void switchBank(uint8_t newBank);
     // Data acquisition
     void readSensor();
+    void readSensorDMA();
     void getAccRawValues(xyzFloat *accRawVal);
     void getGyrRawValues(xyzFloat *gyrRawVal);
     float getTemperature();
@@ -323,8 +326,8 @@ public:
     //USE ONLY OUTSIDE LOOP, HEAP ALLOCATION AND DEALOCATION INSIDE
     bool recycle();
 
- 
 
+    
 
 };
 #endif
