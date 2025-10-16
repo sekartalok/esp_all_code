@@ -6,31 +6,20 @@
 #define NCS  34
 #define ADO  36
 
+#define inter 48
+
 ICM20948_DMA imu(SCL, ADO, SDA, NCS);
 
-void setup() {
-  Serial.begin(115200);
-  
-  if(imu.allInit()){
-    Serial.println("WORKING");
-    
-    
-  }else{
-    
-    Serial.println("not working");
-    while(true);
-  }
-    
-
+volatile bool ready{false};
+void IRAM_ATTR Testinterupt(){
+  ready = true;
 }
 
-void loop() {
-  Serial.println("READ SENSOR");
-
+void read(){
   xyzFloat mag;
   xyzFloat acc;
   xyzFloat gyr;
-  imu.readSensorDMA();
+  imu.readSensor();
   imu.getAccRawValues(&acc);
   imu.getGyrRawValues(&gyr);
   imu.getMagValues(&mag);
@@ -53,7 +42,41 @@ void loop() {
   Serial.print(gyr.y);
   Serial.print("   ");
   Serial.println(gyr.z);
-  delay(1000);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+
+  imu.init();
+  imu.init_AK09916();
+  //imu.setIntPinPolarity(ICM20948_ACT_LOW);
+  imu.enableIntLatch(true);
+  imu.enableDataRedyInterrupt();
+ ///imu.disableOtherInterrupt();
+  attachInterrupt(digitalPinToInterrupt(inter),Testinterupt,RISING);
+  imu.readAndClearInterrupts();
+  imu.dmaEnable();
+
+  
+
+}
+
+void loop() {
+ 
+  if(ready){
+    int a=  imu.readAndClearInterrupts();; 
+    Serial.println(a);
+    if(true){
+    
+    read();
+    }
+    ready = false;
+   imu.readAndClearInterrupts();
+   
+
+  }
+
 
 
 }

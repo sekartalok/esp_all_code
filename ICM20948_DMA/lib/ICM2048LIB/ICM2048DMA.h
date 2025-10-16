@@ -27,7 +27,7 @@ typedef enum MASKING_BIT{
     ICM20948_BANK_MASKING_BIT  = 0x03
 }ICM20948_BitMasking;
 
-enum class ICM20948_INT_TYPE : uint8_t{
+typedef enum INTERUPT_MASTER{
     ICM20948_FSYNC_INT      = 0x01,
     ICM20948_WOM_INT        = 0x02,
     ICM20948_DMP_INT        = 0x04,
@@ -35,7 +35,7 @@ enum class ICM20948_INT_TYPE : uint8_t{
     ICM20948_FIFO_OVF_INT   = 0x10,
     ICM20948_FIFO_WM_INT    = 0x20
 
-};
+} INTERRUPTS;
 
 enum class ICM20948_FIFO_TYPE :uint8_t{
     ICM20948_FIFO_ACC        = 0x10,
@@ -325,6 +325,14 @@ public:
     uint16_t whoAmI_AK09916();
     //USE ONLY OUTSIDE LOOP, HEAP ALLOCATION AND DEALOCATION INSIDE
     bool recycle();
+
+    //interupt 
+    void enableIntLatch(bool latch);
+    void enableDataRedyInterrupt();
+    void disableOtherInterrupt();
+    uint8_t readAndClearInterrupts();
+    void setIntPinPolarity(ICM20948_intPinPol pol);
+
 
 
     

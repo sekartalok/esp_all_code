@@ -498,6 +498,78 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
         delayMicroseconds(10);
     }
 }
+/* ========================= INTERUPT ========================= */
+
+void ICM20948_DMA::enableIntLatch(bool latch){
+    switchBank(0);
+    uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_PIN_CFG));
+
+    if(!latch){
+        temp &= ~static_cast<uint8_t>(REGISTER_BITS::ICM20948_INT_1_LATCH_EN);
+    } else{
+        temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_INT_1_LATCH_EN);
+    }
+
+    writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_PIN_CFG), temp);
+}
+
+void ICM20948_DMA::setIntPinPolarity(ICM20948_intPinPol pol){
+    switchBank(0);
+    uint8_t temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_PIN_CFG));
+
+    if(!pol){
+        temp &= ~static_cast<uint8_t>(REGISTER_BITS::ICM20948_INT1_ACTL);
+    } else{
+        temp |= static_cast<uint8_t>(REGISTER_BITS::ICM20948_INT1_ACTL);
+    }
+
+    writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_PIN_CFG), temp);
+}
+
+void ICM20948_DMA::enableDataRedyInterrupt(){
+    switchBank(0);
+    // Enable only DATA READY interrupt (INT_ENABLE_1 bit 0)
+    writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_ENABLE_1), 0x01);
+}
+
+void ICM20948_DMA::disableOtherInterrupt(){
+
+}
+
+uint8_t ICM20948_DMA::readAndClearInterrupts(){
+    uint8_t intSource = 0;
+    uint8_t regVal = 0;
+    uint8_t master = 0;
+
+
+    regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS));
+    master += regVal;
+    if (regVal & 0x80) { 
+        intSource |= 0x01;
+    }
+
+
+    regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS));
+    master += regVal;
+    if (regVal & 0x08) {   
+        intSource |=0x02;
+    }
+    if (regVal & 0x02) {          
+        intSource |= 0x04;
+    }
+
+   
+    regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1));
+    master += regVal;
+    if (regVal & 0x01) { 
+        intSource |= 0x08;
+    }
+
+  
+
+
+    return master;
+}
 
 
 
