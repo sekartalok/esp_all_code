@@ -64,9 +64,8 @@ void init_gyro(){
 }
 void gyro(){
   xyzFloat gyrRaw; 
-  xyzFloat gyr;
   my_sensor.readSensor();
-  my_sensor.getMagValues(&gyrRaw);
+  my_sensor.getAccRawValues(&gyrRaw);
 
     
   Serial.println("Raw gyroscope values (x,y,z):");
@@ -75,12 +74,6 @@ void gyro(){
   Serial.print(gyrRaw.y);
   Serial.print("   ");
   Serial.println(gyrRaw.z);
-  Serial.println("Gyroscope values (x,y,z):");
-  Serial.print(gyr.x);
-  Serial.print("   ");
-  Serial.print(gyr.y);
-  Serial.print("   ");
-  Serial.println(gyr.z);
   Serial.println();
   delay(500);
 }

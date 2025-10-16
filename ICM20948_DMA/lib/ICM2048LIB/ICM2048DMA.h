@@ -270,6 +270,8 @@ private:
     // Low-level DMA operations
     void writeRegister8(uint8_t bank, uint8_t reg, uint8_t val);
     uint8_t readRegister8(uint8_t bank, uint8_t reg);
+    void pingRegister8(uint8_t bank, uint8_t reg);
+
     void readAllData(uint8_t *data);
     void reset_ICM20948();
     void spiTransfer(size_t len);
@@ -330,8 +332,9 @@ public:
     void enableIntLatch(bool latch);
     void enableDataRedyInterrupt();
     void disableOtherInterrupt();
-    uint8_t readAndClearInterrupts();
+    void readAndClearInterrupts();
     void setIntPinPolarity(ICM20948_intPinPol pol);
+    void readAndClearInterruptDMA();
 
 
 

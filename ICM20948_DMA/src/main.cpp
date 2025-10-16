@@ -48,23 +48,34 @@ void setup() {
   Serial.begin(115200);
 
 
-  if(imu.init()){
+  if(imu.allInit()){
     Serial.println("WORKING");
   }else{
     Serial.println("NOT WORKING");
     while(1);
     
   }
+
+
+  imu.recycle();
+  Serial.println("RECYCLE DONE");
+
+
+
+ // Serial.println(imu.recycle());
+ // while(1);
+ 
   //imu.init_AK09916();
   //imu.end();
   //Serial.println(imu.recycle());
   //imu.setIntPinPolarity(ICM20948_ACT_LOW);
-  //imu.enableIntLatch(true);
-  //imu.enableDataRedyInterrupt();
- ///imu.disableOtherInterrupt();
-  //attachInterrupt(digitalPinToInterrupt(inter),Testinterupt,RISING);
-  //imu.readAndClearInterrupts();
-  //imu.dmaEnable();
+  imu.enableIntLatch(true);
+  imu.enableDataRedyInterrupt();
+
+ //imu.disableOtherInterrupt();
+  attachInterrupt(digitalPinToInterrupt(inter),Testinterupt,RISING);
+  imu.readAndClearInterrupts();
+
 
   
 
@@ -72,18 +83,15 @@ void setup() {
 
 void loop() {
  
-  //if(ready){
-  //  int a=  imu.readAndClearInterrupts();; 
-  //  Serial.println(a);
-  //  if(true){
-    
-    read();
-  //  }
-  //  ready = false;
-  // imu.readAndClearInterrupts();
+  if(ready){
+  imu.readAndClearInterrupts();
+  read();
+  ready = false;
+  imu.readAndClearInterrupts();
    
 
   }
 
+}
 
 

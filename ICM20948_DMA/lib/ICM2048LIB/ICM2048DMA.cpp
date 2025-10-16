@@ -34,12 +34,18 @@ ICM20948_DMA::~ICM20948_DMA() {
 /* ========================= ICM20948 GENERAL SETUP ========================= */
 void ICM20948_DMA::dmaEnable(){
 
-    delay(50);
-    SPI->end();
-    delete SPI;
-    SPI =nullptr;
-    delay(10);
+    if(DMASPI){
+        DMACON = true;
+        return;
+    }
 
+    if(SPI){
+        delay(50);
+        SPI->end();
+        delete SPI;
+        SPI =nullptr;
+        delay(10);
+    }
 
     DMACON = true;
 
@@ -56,7 +62,7 @@ void ICM20948_DMA::dmaEnable(){
     DMASPI->setMaxTransferSize(400);
     DMASPI->setQueueSize(1);
 
-    delay(100);
+    delay(10);
 
 
 
@@ -100,10 +106,10 @@ bool ICM20948_DMA::init() {
     //reset_ICM20948();
     delay(50);
 
-   // if(!AK09916_EN){
-   //     disableI2CMaster();
-   //     delay(50);
-   // }  
+   if(AK09916_EN){
+      disableI2CMaster();
+      delay(50);
+   }  
 
     return true;
 }
@@ -119,10 +125,6 @@ void ICM20948_DMA::end(){
 
         
     }
-    pinMode(csPin, OUTPUT);
-    digitalWrite(csPin, HIGH);
-    SPI = new SPIClass(1);   
-   
 
     delay(50);
 
@@ -140,7 +142,6 @@ void ICM20948_DMA::end(){
         heap_caps_free(dma_rx_buf);
         dma_rx_buf = nullptr;
     }
-    AK09916_EN = false;
 
 }
 
@@ -173,20 +174,32 @@ bool ICM20948_DMA::allInit(){
 /* ========================= RECYCLE ========================= */
 
 bool ICM20948_DMA::recycle(){
+
     end();
+    if(!SPI){
+        pinMode(csPin, OUTPUT);
+        digitalWrite(csPin, HIGH);
+        SPI = new SPIClass(1);   
+    }
+    
     if(!init()){
         end();
         return false;
     }
+
+  
     if(AK09916_EN){
         if(!init_AK09916()){
             end();
             return false;
         }
     }
+
     if(DMACON){
         dmaEnable();
+        switchBank(0);
     }
+  
 
 
     return true;
@@ -538,37 +551,75 @@ void ICM20948_DMA::enableDataRedyInterrupt(){
     writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_ENABLE_1), 0x01);
 }
 
-uint8_t ICM20948_DMA::readAndClearInterrupts(){
-    uint8_t intSource = 0;
-    uint8_t regVal = 0;
- 
+void ICM20948_DMA::readAndClearInterrupts(){
 
+    pingRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS));
+    pingRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS));
+    pingRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1));
 
-    regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS));
-    if (regVal & 0x80) { 
-        intSource |= 0x01;
-    }
-
-
-    regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS));
-    if (regVal & 0x08) {   
-        intSource |=0x02;
-    }
-    if (regVal & 0x02) {          
-        intSource |= 0x04;
-    }
-
-   
-    regVal = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1));
-    if (regVal & 0x01) { 
-        intSource |= 0x08;
-    }
-
-  
-
-
-    return regVal;
 }
+void ICM20948_DMA::readAndClearInterruptDMA(){
+    size_t aligned_len;
+    dma_tx_buf[0]= static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS) | ICM20948_READ_MASKING_BIT;
+    dma_tx_buf[1] = 0x00;
+
+    aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
+
+
+    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
+    DMASPI->trigger();
+
+    dma_tx_buf[0]= static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS) | ICM20948_READ_MASKING_BIT;
+    dma_tx_buf[1] = 0x00;
+
+    aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
+
+
+    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
+    DMASPI->trigger();
+
+    dma_tx_buf[0]= static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1) | ICM20948_READ_MASKING_BIT;
+    dma_tx_buf[1] = 0x00;
+
+    aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
+
+
+    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
+    DMASPI->trigger();
+
+}
+
+void ICM20948_DMA::pingRegister8(uint8_t bank, uint8_t reg){
+
+    switchBank(bank);
+    if(DMACON){
+    dma_tx_buf[0]= reg | ICM20948_READ_MASKING_BIT;
+    dma_tx_buf[1] = 0x00;
+
+    size_t aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
+
+
+    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
+    DMASPI->trigger();
+
+    spiTransfer(2);
+    }else{
+        digitalWrite(csPin, LOW);
+        SPI->beginTransaction(spi_setting);
+
+        SPI->transfer(reg | ICM20948_READ_MASKING_BIT); // read mask
+        SPI->transfer(0x00);
+
+        SPI->endTransaction();
+        digitalWrite(csPin, HIGH);
+    }
+
+    delayMicroseconds(5);
+    
+
+}
+
+
 
 
 
