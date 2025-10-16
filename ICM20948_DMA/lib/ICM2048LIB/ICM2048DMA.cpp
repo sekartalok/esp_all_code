@@ -103,14 +103,20 @@ bool ICM20948_DMA::init() {
     return true;
 }
 void ICM20948_DMA::end(){
+
     spi_setting = SPISettings();
     if(SPI){
         SPI->end();
-        delete SPI;
-        SPI = nullptr;
-
+    }else{
+        pinMode(csPin, OUTPUT);
+        digitalWrite(csPin, HIGH);
+        SPI = new SPIClass(1);   
     }
+
+    delay(50);
+
     if (DMASPI) {
+        DMACON = false;
         DMASPI->end();   
         delete DMASPI;   
         DMASPI = nullptr;
@@ -123,6 +129,7 @@ void ICM20948_DMA::end(){
         heap_caps_free(dma_rx_buf);
         dma_rx_buf = nullptr;
     }
+    AK09916_EN = false;
 
 }
 
@@ -147,9 +154,33 @@ bool ICM20948_DMA::allInit(){
 
     dmaEnable();
     delay(50);
+
+    switchBank(0);
     return true;
 }
-/* recycle */
+
+/* ========================= RECYCLE ========================= */
+
+bool ICM20948_DMA::recycle(){
+    end();
+    if(!init()){
+        end();
+        return false;
+    }
+    if(AK09916_EN){
+        if(!init_AK09916()){
+            end();
+            return false;
+        }
+    }
+    if(DMACON){
+        dmaEnable();
+    }
+
+
+    return true;
+}
+
 
 /* INOP */
 /*
@@ -260,6 +291,25 @@ void ICM20948_DMA::readSensor(){
     }
 
 
+
+}
+void ICM20948_DMA::readSensorDMA(){
+    uint8_t Reg = static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_ACCEL_OUT)| ICM20948_READ_MASKING_BIT;
+    dma_tx_buf[0] = Reg;
+    //zero the tx
+    int i = 1;
+    while(i<=20){
+        dma_tx_buf[i] = 0x00;
+        i++;
+    }
+
+    spiTransfer(21);
+    i = 0;
+    while(i<20){
+        buffer[i] = dma_rx_buf[i+1];
+        i++;
+    }
+    
 
 }
 
@@ -452,7 +502,6 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
 bool ICM20948_DMA::init_AK09916() {
     bool success = false;
 
-
     reset_ICM20948();
     delay(100);
 
@@ -485,6 +534,7 @@ bool ICM20948_DMA::init_AK09916() {
     }
 
     if (success) {
+        AK09916_EN = true;
 
         setMagMode(AK09916_CONT_MODE_100HZ);
     } 

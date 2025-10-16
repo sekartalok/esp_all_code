@@ -242,6 +242,7 @@ typedef enum OTHERS {
 
 class ICM20948_DMA {
 private:
+    bool AK09916_EN{false};
     bool DMACON{false};
     // DMA SPI interface
     ESP32DMASPI::Master * DMASPI;
@@ -267,7 +268,6 @@ private:
     uint8_t gyrRangeFactor{1};
 
     // Low-level DMA operations
-    void switchBank(uint8_t newBank);
     void writeRegister8(uint8_t bank, uint8_t reg, uint8_t val);
     uint8_t readRegister8(uint8_t bank, uint8_t reg);
     void readAllData(uint8_t *data);
@@ -308,7 +308,8 @@ public:
     bool magnetoInit();
     void setMagMode(AK09916_opMode mode);
     bool init_AK09916();
-
+    //switch bank
+    void switchBank(uint8_t newBank);
     // Data acquisition
     void readSensor();
     void getAccRawValues(xyzFloat *accRawVal);

@@ -32,7 +32,7 @@ void loop() {
   xyzFloat mag;
   xyzFloat acc;
   xyzFloat gyr;
-  imu.readSensor();
+  imu.readSensorDMA();
   imu.getAccRawValues(&acc);
   imu.getGyrRawValues(&gyr);
   imu.getMagValues(&mag);
