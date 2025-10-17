@@ -23,7 +23,7 @@ void read(){
   imu.getAccRawValues(&acc);
   imu.getGyrRawValues(&gyr);
   imu.getMagValues(&mag);
-  
+  /*
   Serial.println("MAGNETO");
   Serial.print(mag.x);
   Serial.print("   ");
@@ -36,6 +36,7 @@ void read(){
   Serial.print(acc.y);
   Serial.print("   ");
   Serial.println(acc.z);
+  */
   Serial.println("GYR");
   Serial.print(gyr.x);
   Serial.print("   ");
@@ -57,8 +58,6 @@ void setup() {
   }
 
 
-  imu.recycle();
-  Serial.println("RECYCLE DONE");
 
 
 
@@ -68,12 +67,12 @@ void setup() {
   //imu.init_AK09916();
   //imu.end();
   //Serial.println(imu.recycle());
-  //imu.setIntPinPolarity(ICM20948_ACT_LOW);
+  imu.setIntPinPolarity(ICM20948_ACT_LOW);
   imu.enableIntLatch(true);
   imu.enableDataRedyInterrupt();
 
  //imu.disableOtherInterrupt();
-  attachInterrupt(digitalPinToInterrupt(inter),Testinterupt,RISING);
+  attachInterrupt(digitalPinToInterrupt(inter),Testinterupt,FALLING);
   imu.readAndClearInterrupts();
 
 

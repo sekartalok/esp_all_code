@@ -272,6 +272,10 @@ private:
     uint8_t readRegister8(uint8_t bank, uint8_t reg);
     void pingRegister8(uint8_t bank, uint8_t reg);
 
+    //reg16 only SPI
+    void writeRegister16(uint8_t bank, uint8_t reg, int16_t val);
+    uint16_t readRegister16(uint8_t bank, uint8_t reg);
+
     void readAllData(uint8_t *data);
     void reset_ICM20948();
     void spiTransfer(size_t len);
@@ -335,6 +339,13 @@ public:
     void readAndClearInterrupts();
     void setIntPinPolarity(ICM20948_intPinPol pol);
     void readAndClearInterruptDMA();
+
+
+    //DATARATE
+    void setAccSampleRateDivider(uint8_t data);
+    void setGyrSampleRateDivider(uint8_t data);
+
+ 
 
 
 

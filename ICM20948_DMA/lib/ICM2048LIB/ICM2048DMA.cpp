@@ -155,12 +155,14 @@ bool ICM20948_DMA::allInit(){
     }
     delay(50);
     setAccRange(ICM20948_ACC_RANGE_2G);
-    setAccDLPF(ICM20948_DLPF_6);
+    setAccDLPF(ICM20948_DLPF_7);
+    setAccSampleRateDivider(0);
     delay(10);
     setGyrRange(ICM20948_GYRO_RANGE_250);
-    setGyrDLPF(ICM20948_DLPF_6);
+    setGyrDLPF(ICM20948_DLPF_0);
+    setGyrSampleRateDivider(0);
     delay(10);
-    setMagMode(AK09916_CONT_MODE_20HZ);
+    setMagMode(AK09916_CONT_MODE_100HZ);
     delay(50);
     
 
@@ -278,6 +280,39 @@ uint8_t ICM20948_DMA::readRegister8(uint8_t bank, uint8_t reg) {
     delayMicroseconds(5);
     return Return;
 
+}
+
+void ICM20948_DMA::writeRegister16(uint8_t bank, uint8_t reg, int16_t val){
+    switchBank(bank);
+    uint8_t ADDH = ((val >> 8) & 0xFF);
+    uint8_t ADDL = val & 0xFF;
+    digitalWrite(csPin,LOW);
+    SPI->beginTransaction(spi_setting);
+    
+    SPI->transfer(reg & ICM20948_WRITE_MASKING_BIT);
+    SPI->transfer(ADDH);
+    SPI->transfer(ADDL);
+
+    SPI->endTransaction();
+    digitalWrite(csPin,HIGH);
+}
+
+uint16_t ICM20948_DMA::readRegister16(uint8_t bank, uint8_t reg){
+    uint16_t returns;
+    uint8_t ADDH = 0x00;
+    uint8_t ADDL = 0x00;
+
+    digitalWrite(csPin,LOW);
+    SPI->beginTransaction(spi_setting);
+    SPI->transfer(reg | ICM20948_READ_MASKING_BIT);
+    ADDH = SPI->transfer(0x00);
+    ADDL = SPI->transfer(0x00);
+    SPI->endTransaction();
+    digitalWrite(csPin,HIGH);
+
+
+    returns = (ADDH << 8) | ADDL;
+    return returns;
 }
 
 /* ========================= SENSOR DATA READ ========================= */
@@ -517,6 +552,16 @@ void ICM20948_DMA::switchBank(uint8_t newBank) {
         delayMicroseconds(10);
     }
 }
+/* ========================= SAMPLE RATE DEVIDER ========================= */
+ void ICM20948_DMA::setAccSampleRateDivider(uint8_t data){
+    writeRegister16(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::ACCEL_SMPLRT_DIV_1),data);
+ }
+ void ICM20948_DMA::setGyrSampleRateDivider(uint8_t data){
+    writeRegister8(2,static_cast<uint8_t>(ICM20948_Bank_2_Registers::GYRO_SMPLRT_DIV),data);
+
+ }
+
+
 /* ========================= INTERUPT ========================= */
 
 void ICM20948_DMA::enableIntLatch(bool latch){

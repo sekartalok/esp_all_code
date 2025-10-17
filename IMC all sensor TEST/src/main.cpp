@@ -55,17 +55,15 @@ void loop() {
 
 void init_gyro(){
 
-  Serial.println("DONT MOVE CALLIBRATIONS.....");
-  my_sensor.autoOffsets();
-  Serial.println("done calibrating");
+
   my_sensor.setGyrRange(ICM20948_GYRO_RANGE_250);
-  my_sensor.setGyrDLPF(ICM20948_DLPF_6);  
+  my_sensor.setGyrDLPF(ICM20948_DLPF_7);  
 
 }
 void gyro(){
   xyzFloat gyrRaw; 
   my_sensor.readSensor();
-  my_sensor.getAccRawValues(&gyrRaw);
+  my_sensor.getGyrRawValues(&gyrRaw);
 
     
   Serial.println("Raw gyroscope values (x,y,z):");
@@ -75,5 +73,4 @@ void gyro(){
   Serial.print("   ");
   Serial.println(gyrRaw.z);
   Serial.println();
-  delay(500);
 }
