@@ -73,7 +73,14 @@ void setup() {
 
  //imu.disableOtherInterrupt();
   attachInterrupt(digitalPinToInterrupt(inter),Testinterupt,FALLING);
+  Serial.println("begine");
+  delay(1000);
   imu.readAndClearInterrupts();
+  delay(1000);
+  Serial.println("NEXT");
+  imu.readAndClearInterrupts();
+  delay(3000);
+
 
 
   

@@ -7,6 +7,7 @@ ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(
     SPI = new SPIClass(1);
 }
 
+
 // Destructor
 ICM20948_DMA::~ICM20948_DMA() {
 
@@ -29,6 +30,37 @@ ICM20948_DMA::~ICM20948_DMA() {
         heap_caps_free(dma_rx_buf);
         dma_rx_buf = nullptr;
     }
+
+}
+/* ========================= MASTER TIMER INTTERUPT ========================= */
+volatile bool ICM20948_DMA::delay_done = false;
+esp_timer_handle_t ICM20948_DMA::delayTimerHandler = nullptr;
+
+void IRAM_ATTR ICM20948_DMA:: delayTimer(void* arg){
+     delay_done = true;
+}
+void ICM20948_DMA:: initdelay(){
+    delay_done = false;
+    const esp_timer_create_args_t timerArgs = {
+    .callback = &delayTimer,
+    .arg = nullptr,
+    .dispatch_method = ESP_TIMER_TASK,
+    .name = "dma_delay_timer"
+  };
+
+  esp_timer_create(&timerArgs, &delayTimerHandler);
+
+
+}
+
+void ICM20948_DMA::timerDelay(uint32_t us){
+    delay_done = false;
+    esp_timer_start_once(delayTimerHandler, us); 
+    while (!delay_done) {
+    vTaskDelay(1);
+    }
+
+
 }
 
 /* ========================= ICM20948 GENERAL SETUP ========================= */
@@ -110,7 +142,7 @@ bool ICM20948_DMA::init() {
       disableI2CMaster();
       delay(50);
    }  
-
+    initdelay();
     return true;
 }
 void ICM20948_DMA::end(){
@@ -641,19 +673,23 @@ void ICM20948_DMA::pingRegister8(uint8_t bank, uint8_t reg){
     dma_tx_buf[0]= reg | ICM20948_READ_MASKING_BIT;
     dma_tx_buf[1] = 0x00;
 
-    size_t aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
+    size_t aligned_len = (2 + 3) & ~0x03; // 4byte is missing SPI SLAVE
+    
 
-
-    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
+    DMASPI->queue(dma_tx_buf, dma_rx_buf , aligned_len);
+    delay(10);
     DMASPI->trigger();
+    
 
-    spiTransfer(2);
+
+    Serial.println(dma_rx_buf[1]);
+
     }else{
         digitalWrite(csPin, LOW);
         SPI->beginTransaction(spi_setting);
 
         SPI->transfer(reg | ICM20948_READ_MASKING_BIT); // read mask
-        SPI->transfer(0x00);
+        Serial.println( SPI->transfer(0x00));
 
         SPI->endTransaction();
         digitalWrite(csPin, HIGH);
