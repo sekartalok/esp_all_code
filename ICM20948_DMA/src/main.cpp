@@ -23,7 +23,7 @@ void read(){
   imu.getAccRawValues(&acc);
   imu.getGyrRawValues(&gyr);
   imu.getMagValues(&mag);
-  /*
+ 
   Serial.println("MAGNETO");
   Serial.print(mag.x);
   Serial.print("   ");
@@ -36,7 +36,7 @@ void read(){
   Serial.print(acc.y);
   Serial.print("   ");
   Serial.println(acc.z);
-  */
+ 
   Serial.println("GYR");
   Serial.print(gyr.x);
   Serial.print("   ");
