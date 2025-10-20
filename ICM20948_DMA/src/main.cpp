@@ -79,7 +79,11 @@ void setup() {
   delay(1000);
   Serial.println("NEXT");
   imu.readAndClearInterrupts();
-  delay(3000);
+  
+
+ 
+
+
 
 
 
@@ -88,9 +92,10 @@ void setup() {
 }
 
 void loop() {
- 
+  uint8_t master=0; 
   if(ready){
-  imu.readAndClearInterrupts();
+  master = imu.readAndClearInterrupts();
+  Serial.println(master);
   read();
   ready = false;
   imu.readAndClearInterrupts();

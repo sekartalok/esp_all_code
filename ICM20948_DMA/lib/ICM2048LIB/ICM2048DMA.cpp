@@ -7,7 +7,6 @@ ICM20948_DMA::ICM20948_DMA(int scl,int ado,int sda,int cs): sclPin(scl), adoPin(
     SPI = new SPIClass(1);
 }
 
-
 // Destructor
 ICM20948_DMA::~ICM20948_DMA() {
 
@@ -30,37 +29,6 @@ ICM20948_DMA::~ICM20948_DMA() {
         heap_caps_free(dma_rx_buf);
         dma_rx_buf = nullptr;
     }
-
-}
-/* ========================= MASTER TIMER INTTERUPT ========================= */
-volatile bool ICM20948_DMA::delay_done = false;
-esp_timer_handle_t ICM20948_DMA::delayTimerHandler = nullptr;
-
-void IRAM_ATTR ICM20948_DMA:: delayTimer(void* arg){
-     delay_done = true;
-}
-void ICM20948_DMA:: initdelay(){
-    delay_done = false;
-    const esp_timer_create_args_t timerArgs = {
-    .callback = &delayTimer,
-    .arg = nullptr,
-    .dispatch_method = ESP_TIMER_TASK,
-    .name = "dma_delay_timer"
-  };
-
-  esp_timer_create(&timerArgs, &delayTimerHandler);
-
-
-}
-
-void ICM20948_DMA::timerDelay(uint32_t us){
-    delay_done = false;
-    esp_timer_start_once(delayTimerHandler, us); 
-    while (!delay_done) {
-    vTaskDelay(1);
-    }
-
-
 }
 
 /* ========================= ICM20948 GENERAL SETUP ========================= */
@@ -142,7 +110,7 @@ bool ICM20948_DMA::init() {
       disableI2CMaster();
       delay(50);
    }  
-    initdelay();
+
     return true;
 }
 void ICM20948_DMA::end(){
@@ -628,11 +596,32 @@ void ICM20948_DMA::enableDataRedyInterrupt(){
     writeRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_ENABLE_1), 0x01);
 }
 
-void ICM20948_DMA::readAndClearInterrupts(){
+uint8_t ICM20948_DMA::readAndClearInterrupts(){
+    uint8_t temp = 0;
+    uint8_t val  = 0;
 
-    pingRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS));
-    pingRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS));
-    pingRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1));
+    vTaskDelay( pdMS_TO_TICKS(1) );
+    temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_I2C_MST_STATUS));
+    if(temp & 0x80){ val |= 0x01;}
+    vTaskDelay( pdMS_TO_TICKS(1) );
+    temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS));
+    if(temp & 0x08){ val |= 0x02;}
+    if(temp & 0x02){ val |= 0x04;}
+    vTaskDelay( pdMS_TO_TICKS(1) );
+    temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_1));
+    if(temp & 0x01){ val |= 0x08;}
+    vTaskDelay( pdMS_TO_TICKS(1) );
+    temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_2));
+    if(temp & 0x01){ val |= 0x10;}
+    vTaskDelay( pdMS_TO_TICKS(1) );
+    temp = readRegister8(0, static_cast<uint8_t>(ICM20948_Bank0_Registers::ICM20948_INT_STATUS_3));
+    if(temp & 0x01){ val |= 0x20;}
+    vTaskDelay( pdMS_TO_TICKS(1) );
+
+    return val;
+    
+
+
 
 }
 void ICM20948_DMA::readAndClearInterruptDMA(){
@@ -673,23 +662,19 @@ void ICM20948_DMA::pingRegister8(uint8_t bank, uint8_t reg){
     dma_tx_buf[0]= reg | ICM20948_READ_MASKING_BIT;
     dma_tx_buf[1] = 0x00;
 
-    size_t aligned_len = (2 + 3) & ~0x03; // 4byte is missing SPI SLAVE
-    
+    size_t aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
 
-    DMASPI->queue(dma_tx_buf, dma_rx_buf , aligned_len);
-    delay(10);
+
+    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
     DMASPI->trigger();
-    
 
-
-    Serial.println(dma_rx_buf[1]);
-
+    spiTransfer(2);
     }else{
         digitalWrite(csPin, LOW);
         SPI->beginTransaction(spi_setting);
 
         SPI->transfer(reg | ICM20948_READ_MASKING_BIT); // read mask
-        Serial.println( SPI->transfer(0x00));
+        SPI->transfer(0x00);
 
         SPI->endTransaction();
         digitalWrite(csPin, HIGH);

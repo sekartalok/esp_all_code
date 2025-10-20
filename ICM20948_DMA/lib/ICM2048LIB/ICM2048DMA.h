@@ -266,9 +266,6 @@ private:
     xyzFloat gyrOffsetVal{};
     uint8_t accRangeFactor{1};
     uint8_t gyrRangeFactor{1};
-    //delay con
-    static volatile bool delay_done ;
-    static esp_timer_handle_t delayTimerHandler;
 
     // Low-level DMA operations
     void writeRegister8(uint8_t bank, uint8_t reg, uint8_t val);
@@ -295,13 +292,7 @@ private:
     void AK09916_enableMagRead(uint8_t reg ,uint8_t byte);
     void setupMagnetometerSLV0();
     void setMagMode(uint8_t mode);
-    
 
-     //timer interrupt 
-
-    static void IRAM_ATTR delayTimer(void* arg);
-    void initdelay();
-    void timerDelay(uint32_t us);
 
 public:
     // Constructor: specify all SPI pins and optional I2C pins
@@ -345,7 +336,7 @@ public:
     void enableIntLatch(bool latch);
     void enableDataRedyInterrupt();
     void disableOtherInterrupt();
-    void readAndClearInterrupts();
+    uint8_t readAndClearInterrupts();
     void setIntPinPolarity(ICM20948_intPinPol pol);
     void readAndClearInterruptDMA();
 
@@ -354,8 +345,6 @@ public:
     void setAccSampleRateDivider(uint8_t data);
     void setGyrSampleRateDivider(uint8_t data);
 
-
-   
  
 
 
