@@ -1,5 +1,5 @@
 #include "GPIOIMC.h"
-
+#include <ICM20948_WE.h> // Assuming this is the header for the library
 
 #if spi == 1
 ICM20948_WE my_sensor(&SPI, NCS, spi);
@@ -16,8 +16,6 @@ void IRAM_ATTR dataReadyISR() {
   dataReady = true;
 }
 
-
-
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -32,40 +30,50 @@ void setup() {
     Serial.println("NOT WORKING");
     while(1);  // Halt if sensor init fails
   }
+  
   init_gyro();
-  //my_sensor.setIntPinPolarity(ICM20948_ACT_LOW);
-  my_sensor.enableIntLatch(true);
+  
+
+  
   my_sensor.enableInterrupt(ICM20948_DATA_READY_INT);
   attachInterrupt(digitalPinToInterrupt(intPin),dataReadyISR,RISING);
+ // my_sensor.readAndClearInterrupts(); // Clear any pending interrupts at startup
+
+
+   //my_sensor.setIntPinPolarity(ICM20948_ACT_LOW);
+  my_sensor.enableIntLatch(true);
+  
+  // ADD THIS LINE to enable clearing the interrupt on any register read
+  my_sensor.enableClearIntByAnyRead(true); 
+
   my_sensor.readAndClearInterrupts();
-
-
 }
 
 void loop() {
   if(dataReady){
-    Serial.println( my_sensor.readAndClearInterrupts());
-    gyro();
-    dataReady = false;
-    my_sensor.readAndClearInterrupts();
+    dataReady = false; // Reset the flag immediately
+    
+    // This function now reads data AND clears the interrupt
+    gyro(); 
+    
+    // The manual readAndClearInterrupts() calls are no longer needed
   }
 }
 
-
-
 void init_gyro(){
-
-
   my_sensor.setGyrRange(ICM20948_GYRO_RANGE_250);
-  my_sensor.setGyrDLPF(ICM20948_DLPF_7);  
-
+  my_sensor.setGyrDLPF(ICM20948_DLPF_7);   
 }
+
 void gyro(){
   xyzFloat gyrRaw; 
-  my_sensor.readSensor();
+  
+  // This call will read the sensor data and, because of the new setting,
+  // it will also clear the DATA_READY_INT status.
+  my_sensor.readSensor(); 
+  
   my_sensor.getGyrRawValues(&gyrRaw);
-
-    
+  
   Serial.println("Raw gyroscope values (x,y,z):");
   Serial.print(gyrRaw.x);
   Serial.print("   ");
