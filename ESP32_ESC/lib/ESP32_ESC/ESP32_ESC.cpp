@@ -58,6 +58,7 @@ void ESP32_ESC::begin(unsigned int rotor0,unsigned int rotor1,unsigned int rotor
 
 }
 
+//set angle of the freq
 uint32_t ESP32_ESC::angleToDuty(int angle){
     int us = map(angle,0,180,minRotor,maxRotor);
     return (uint32_t)((us / 20000.0f) * 4095); //transfer to 12 bit
