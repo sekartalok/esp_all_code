@@ -270,7 +270,7 @@ private:
     // Low-level DMA operations
     void writeRegister8(uint8_t bank, uint8_t reg, uint8_t val);
     uint8_t readRegister8(uint8_t bank, uint8_t reg);
-    void pingRegister8(uint8_t bank, uint8_t reg);
+    
 
     //reg16 only SPI
     void writeRegister16(uint8_t bank, uint8_t reg, int16_t val);

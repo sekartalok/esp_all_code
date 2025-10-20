@@ -655,35 +655,6 @@ void ICM20948_DMA::readAndClearInterruptDMA(){
 
 }
 
-void ICM20948_DMA::pingRegister8(uint8_t bank, uint8_t reg){
-
-    switchBank(bank);
-    if(DMACON){
-    dma_tx_buf[0]= reg | ICM20948_READ_MASKING_BIT;
-    dma_tx_buf[1] = 0x00;
-
-    size_t aligned_len = (1 + 3) & ~0x03; // 4byte is missing SPI SLAVE
-
-
-    DMASPI->queue(dma_tx_buf, NULL , aligned_len);
-    DMASPI->trigger();
-
-    spiTransfer(2);
-    }else{
-        digitalWrite(csPin, LOW);
-        SPI->beginTransaction(spi_setting);
-
-        SPI->transfer(reg | ICM20948_READ_MASKING_BIT); // read mask
-        SPI->transfer(0x00);
-
-        SPI->endTransaction();
-        digitalWrite(csPin, HIGH);
-    }
-
-    delayMicroseconds(5);
-    
-
-}
 
 
 
